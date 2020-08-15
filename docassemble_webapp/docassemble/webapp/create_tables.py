@@ -9,7 +9,7 @@ from docassemble.base.functions import word
 from docassemble.webapp.app_object import app
 from docassemble.webapp.db_object import db
 from docassemble.webapp.users.models import UserModel, UserAuthModel, Role, UserDict, UserDictKeys, ChatLog
-from docassemble.webapp.core.models import Uploads, ObjectStorage, SpeakList, Shortener, MachineLearning, GlobalObjectStorage
+from docassemble.webapp.core.models import Uploads, ObjectStorage, SpeakList, Shortener, MachineLearning, GlobalObjectStorage, JsonStorage
 
 import docassemble.webapp.core.models
 from docassemble.webapp.packages.models import Package
@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, MetaData
 #import random
 #import string
 from docassemble.base.generate_key import random_alphanumeric
-from flask_user import UserManager, SQLAlchemyAdapter
+from docassemble_flask_user import UserManager, SQLAlchemyAdapter
 import pkg_resources
 import os
 from docassemble.webapp.database import alchemy_connection_string, dbtableprefix

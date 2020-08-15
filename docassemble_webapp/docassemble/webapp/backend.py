@@ -4,7 +4,7 @@ from docassemble.base.config import daconfig, hostname, in_celery
 from docassemble.webapp.files import SavedFile, get_ext_and_mimetype
 from docassemble.base.logger import logmessage
 from docassemble.webapp.users.models import UserModel, Role, ChatLog, UserDict, UserDictKeys, UserAuthModel, UserRoles
-from docassemble.webapp.core.models import Uploads, UploadsUserAuth, UploadsRoleAuth, SpeakList, ObjectStorage, Shortener, MachineLearning, GlobalObjectStorage
+from docassemble.webapp.core.models import Uploads, UploadsUserAuth, UploadsRoleAuth, SpeakList, ObjectStorage, Shortener, MachineLearning, GlobalObjectStorage, Email, EmailAttachment
 from docassemble.webapp.packages.models import PackageAuth
 from docassemble.base.generate_key import random_string, random_bytes, random_alphanumeric
 from sqlalchemy import or_, and_
@@ -787,6 +787,8 @@ def reset_user_dict(user_code, filename, user_id=None, temp_user_id=None, force=
             files_to_delete.append(upload.indexno)
         Uploads.query.filter_by(key=user_code, yamlfile=filename, persistent=False).delete()
         db.session.commit()
+        GlobalObjectStorage.query.filter(GlobalObjectStorage.key.like('da:uid:' + user_code + ':i:' + filename + ':%')).delete(synchronize_session=False)
+        db.session.commit()
         ChatLog.query.filter_by(key=user_code, filename=filename).delete()
         db.session.commit()
         for short_code_item in Shortener.query.filter_by(uid=user_code, filename=filename).all():
@@ -795,6 +797,7 @@ def reset_user_dict(user_code, filename, user_id=None, temp_user_id=None, force=
                     files_to_delete.append(attachment.upload)
         Shortener.query.filter_by(uid=user_code, filename=filename).delete()
         db.session.commit()
+        # docassemble.base.functions.server.delete_answer_json(user_code, filename, delete_all=True)
         for file_number in files_to_delete:
             the_file = SavedFile(file_number)
             the_file.delete()

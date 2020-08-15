@@ -542,7 +542,7 @@ def pdf_filter(text, metadata=None, question=None):
     text = re.sub(r'\[BORDER\] *(.+?)\n *\n', border_pdf, text, flags=re.MULTILINE | re.DOTALL)
     return(text)
 
-def html_filter(text, status=None, question=None, embedder=None, default_image_width=None):
+def html_filter(text, status=None, question=None, embedder=None, default_image_width=None, external=False):
     if question is None and status is not None:
         question = status.question
     text = text + "\n\n"
@@ -554,10 +554,10 @@ def html_filter(text, status=None, question=None, embedder=None, default_image_w
     #     text = re.sub(r'\[FIELD ([^\]]+)\]', 'ERROR: FIELD cannot be used here', text)
     text = re.sub(r'\[TARGET ([^\]]+)\]', target_html, text)
     if docassemble.base.functions.this_thread.evaluation_context != 'docx':
-        text = re.sub(r'\[EMOJI ([^,\]]+), *([0-9A-Za-z.%]+)\]', lambda x: image_url_string(x, emoji=True, question=question), text)
-        text = re.sub(r'\[FILE ([^,\]]+), *([0-9A-Za-z.%]+), *([^\]]*)\]', lambda x: image_url_string(x, question=question), text)
-        text = re.sub(r'\[FILE ([^,\]]+), *([0-9A-Za-z.%]+)\]', lambda x: image_url_string(x, question=question), text)
-        text = re.sub(r'\[FILE ([^,\]]+)\]', lambda x: image_url_string(x, question=question, default_image_width=default_image_width), text)
+        text = re.sub(r'\[EMOJI ([^,\]]+), *([0-9A-Za-z.%]+)\]', lambda x: image_url_string(x, emoji=True, question=question, external=external), text)
+        text = re.sub(r'\[FILE ([^,\]]+), *([0-9A-Za-z.%]+), *([^\]]*)\]', lambda x: image_url_string(x, question=question, external=external), text)
+        text = re.sub(r'\[FILE ([^,\]]+), *([0-9A-Za-z.%]+)\]', lambda x: image_url_string(x, question=question, external=external), text)
+        text = re.sub(r'\[FILE ([^,\]]+)\]', lambda x: image_url_string(x, question=question, default_image_width=default_image_width, external=external), text)
         text = re.sub(r'\[QR ([^,\]]+), *([0-9A-Za-z.%]+), *([^\]]*)\]', qr_url_string, text)
         text = re.sub(r'\[QR ([^,\]]+), *([0-9A-Za-z.%]+)\]', qr_url_string, text)
         text = re.sub(r'\[QR ([^,\]]+)\]', qr_url_string, text)
@@ -903,7 +903,7 @@ def pixels_in(length):
     logmessage("Could not read " + str(length) + "\n")
     return(300)
 
-def image_url_string(match, emoji=False, question=None, playground=False, default_image_width=None):
+def image_url_string(match, emoji=False, question=None, playground=False, default_image_width=None, external=False):
     file_reference = match.group(1)
     try:
         width = match.group(2)
@@ -922,6 +922,9 @@ def image_url_string(match, emoji=False, question=None, playground=False, defaul
             alt_text = ''
     else:
         alt_text = ''
+    return image_url(file_reference, alt_text, width, emoji=emoji, question=question, playground=playground, external=external)
+
+def image_url(file_reference, alt_text, width, emoji=False, question=None, playground=False, external=False):
     file_info = server.file_finder(file_reference, question=question)
     if 'mimetype' in file_info and file_info['mimetype'] is not None:
         if re.search(r'^audio', file_info['mimetype']):
@@ -942,7 +945,7 @@ def image_url_string(match, emoji=False, question=None, playground=False, defaul
         if emoji:
             width_string += ';vertical-align: middle'
             alt_text = 'alt="" '
-        the_url = server.url_finder(file_reference, _question=question, display_filename=file_info['filename'])
+        the_url = server.url_finder(file_reference, _question=question, display_filename=file_info['filename'], _external=external)
         if the_url is None:
             return ('[ERROR: File reference ' + str(file_reference) + ' cannot be displayed]')
         if width_string == 'width:100%':
@@ -955,13 +958,16 @@ def image_url_string(match, emoji=False, question=None, playground=False, defaul
             if file_info['extension'] in ('docx', 'rtf', 'doc', 'odt') and not os.path.isfile(file_info['path'] + '.pdf'):
                 server.fg_make_pdf_for_word_path(file_info['path'], file_info['extension'])
                 server.fg_make_png_for_pdf_path(file_info['path'] + ".pdf", 'screen', page=1)
+                if re.match(r'[0-9]+', str(file_reference)):
+                    sf = server.SavedFile(int(file_reference), fix=True)
+                    sf.finalize()
             if 'pages' not in file_info:
                 try:
                     reader = PyPDF2.PdfFileReader(open(file_info['path'] + '.pdf', 'rb'))
                     file_info['pages'] = reader.getNumPages()
                 except:
                     file_info['pages'] = 1
-            image_url = server.url_finder(file_reference, size="screen", page=1, _question=question)
+            image_url = server.url_finder(file_reference, size="screen", page=1, _question=question, _external=external)
             if image_url is None:
                 return ('[ERROR: File reference ' + str(file_reference) + ' cannot be displayed]')
             if 'filename' in file_info:
@@ -1149,7 +1155,7 @@ def emoji_html(text, status=None, question=None, images=None):
     if text in images:
         if status is not None and images[text].attribution is not None:
             status.attributions.add(images[text].attribution)
-        return("[EMOJI " + images[text].get_reference() + ', 1em]')
+        return image_url(images[text].get_reference(), word('icon'), '1em', emoji=True, question=question)
     icons_setting = docassemble.base.functions.get_config('default icons', None)
     if icons_setting == 'font awesome':
         m = re.search(r'^(fa[a-z])-fa-(.*)', text)
@@ -1193,7 +1199,7 @@ def link_rewriter(m, status):
     status.linkcounter += 1
     return '<a data-linknum="' + str(status.linkcounter) + '" ' + action_data + target + js_data + 'href="' + m.group(1) + '"'
 
-def markdown_to_html(a, trim=False, pclass=None, status=None, question=None, use_pandoc=False, escape=False, do_terms=True, indent=None, strip_newlines=None, divclass=None, embedder=None, default_image_width=None):
+def markdown_to_html(a, trim=False, pclass=None, status=None, question=None, use_pandoc=False, escape=False, do_terms=True, indent=None, strip_newlines=None, divclass=None, embedder=None, default_image_width=None, external=False):
     a = str(a)
     if question is None and status is not None:
         question = status.question
@@ -1238,9 +1244,7 @@ def markdown_to_html(a, trim=False, pclass=None, status=None, question=None, use
                         #logmessage("Searching for term " + term + " in " + a + "\n")
                         a = question.interview.autoterms[question.language][term]['re'].sub(r'[[\1]]', a)
                         #logmessage("string is now " + str(a) + "\n")
-    if status is not None and question.interview.scan_for_emojis:
-        a = emoji_match.sub((lambda x: emoji_html(x.group(1), status=status, question=question)), a)
-    a = html_filter(str(a), status=status, question=question, embedder=embedder, default_image_width=default_image_width)
+    a = html_filter(str(a), status=status, question=question, embedder=embedder, default_image_width=default_image_width, external=external)
     #logmessage("before: " + a)
     if use_pandoc:
         converter = pandoc.MyPandoc()
@@ -1273,6 +1277,8 @@ def markdown_to_html(a, trim=False, pclass=None, status=None, question=None, use
             result = term_match.sub((lambda x: add_terms(x.group(1), question.interview.autoterms[lang], status=status, question=question)), result)
         elif question.language in question.interview.autoterms and len(question.interview.autoterms[question.language]):
             result = term_match.sub((lambda x: add_terms(x.group(1), question.interview.autoterms[question.language], status=status, question=question)), result)
+    if status is not None and question.interview.scan_for_emojis:
+        result = emoji_match.sub((lambda x: emoji_html(x.group(1), status=status, question=question)), result)
     if trim:
         if result.startswith('<p>') and result.endswith('</p>'):
             result = re.sub(r'</p>\s*<p>', ' ', result[3:-4])

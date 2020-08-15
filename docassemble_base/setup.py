@@ -48,7 +48,7 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
 openpyxl_version = "2.5.14" if sys.version.startswith('3.5') else "3.0.0"
 twine_version = "1.15.0" if sys.version.startswith('3.5') else "2.0.0"
 install_requires = [
-    'docassemble==1.1.26',
+    'docassemble==1.1.55',
     "3to2==1.1.1",
     "alembic==1.2.1",
     "astunparse==1.6.2",
@@ -69,7 +69,7 @@ install_requires = [
     "convertapi==1.1.0",
     "docutils==0.15.2",
     "docxcompose==1.0.2",
-    "docxtpl==0.6.3",
+    "docxtpl==0.10.0",
     "et-xmlfile==1.0.1",
     "fdfgen==0.16.1",
     "feedparser==5.2.1",
@@ -82,7 +82,7 @@ install_requires = [
     "google-auth-oauthlib==0.4.1",
     "google-i18n-address==2.3.5",
     "guess-language-spirit==0.5.3",
-    "httplib2==0.14.0",
+    "httplib2==0.18.0",
     "idna==2.8",
     "importlib-metadata==0.23",
     "itsdangerous==1.1.0",
@@ -107,8 +107,7 @@ install_requires = [
     "passlib==1.7.1",
     "pathlib==1.0.1",
     "Pattern==3.6",
-    "pdfminer.six==20191020",
-    "pdfminer3k==1.3.1",
+    "pdfminer.six==20200517",
     "phonenumbers==8.10.21",
     "Pillow==6.2.1",
     "pkginfo==1.5.0.1",
@@ -134,7 +133,7 @@ install_requires = [
     "pypng==0.0.20",
     "pytest==5.2.2",
     "python-dateutil==2.8.0",
-    "python-docx==0.8.7",
+    "python-docx==0.8.10",
     "python-editor==1.0.4",
     "pytz==2019.3",
     "PyYAML==5.1.2",
@@ -163,7 +162,7 @@ install_requires = [
     "uritemplate==3.0.0",
     "urllib3==1.25.6",
     "us==1.0.0",
-    "user-agents==2.0",
+    "user-agents==2.1",
     "wcwidth==0.1.7",
     "webencodings==0.5.1",
     "Werkzeug==1.0.0",
@@ -175,7 +174,7 @@ install_requires = [
 ]
 
 setup(name='docassemble.base',
-      version='1.1.26',
+      version='1.1.55',
       python_requires='>=3.5',
       description=('The base components of the docassemble system.'),
       long_description=read("README.md"),

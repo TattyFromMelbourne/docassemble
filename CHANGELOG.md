@@ -1,5 +1,211 @@
 # Change Log
 
+## [1.1.55] - 2020-08-06
+### Added
+- The `create_session()` function.
+- The `package` attribute of the output of `user_info()`.
+- The `make_copy` keyword parameter for `all_variables()`.
+- The `overwrite` keyword parameter for `set_session_variables()`.
+- The `overwrite` parameter for the `/api/session` POST endpoint.
+- The `persistent` option for the `/api/session/action` POST endpoint.
+- Recipe for passing variables from one session to a newly created
+  other session.
+
+## [1.1.54] - 2020-08-04
+### Added
+- The `attr_name()` method of the `DAObject` class.
+- The `dry_run` keyword parameter for `send_email()` and `send_sms()`.
+### Changed
+- The `str` keyword parameter when initializing a `DAEmpty` object.
+- New recipe for gathering multiple signatures; uses a modular
+  approach.
+### Fixed
+- Missing control for `capitalize` in some language functions.
+- SendGrid fails when subject line is empty string.
+- The `temporary` and `once_temporary` keyword parameters for
+  `interview_url_action()` were not working.
+- Problem with running interviews in a different tab in Playground on
+  Chrome.
+
+## [1.1.53] - 2020-07-29
+### Fixed
+- Error in Docassemble-Flask-User dependency.
+
+## [1.1.52] - 2020-07-29
+### Fixed
+- Moved evaluation of section information to post-assembly when
+  getting question data.
+
+## [1.1.51] - 2020-07-28
+### Added
+- The `footer` screen part.
+- `terms` and `autoterms` are now included in JSON question data.
+### Fixed
+- `signature` blocks did not support `continue button field`.
+- System message translation system had gaps due to the integration
+  with Flask-User's translation system not working as intended.
+- Inconsistent behavior of `force_ask()` depending on whether an item
+  was listed first or not.
+
+## [1.1.50] - 2020-07-21
+### Added
+- Feature for viewing names in an interview and the YAML blocks
+  associated with them.
+### Fixed
+- Missing `.copy()` method for `DAList`.
+- The `init()` method of the `DAFileCollection` class did not accept
+  arbitrary parameters.
+- Fully qualified image URLs now work in e-mail HTML.
+
+## [1.1.49] - 2020-07-07
+### Fixed
+- Additional input validation on parameters passed to APIs.
+
+## [1.1.48] - 2020-07-06
+### Fixed
+- The `/api/user_info` API endpoint and the `get_user_info()` function
+  now do case insensitive searches for e-mail addresses.
+
+## [1.1.47] - 2020-07-05
+### Added
+- The `store_variables_snapshot()` function.
+
+## [1.1.46] - 2020-07-05
+### Fixed
+- Error in restart module.
+
+## [1.1.45] - 2020-07-05
+### Fixed
+- Error in table creation module.
+
+## [1.1.44] - 2020-07-05
+### Changed
+- The `interview_list()` function, when called without an `action`,
+  now uses pagination and returns a tuple instead of a list.  Note
+  that this change is not backwards-compatible, so you will need to
+  change any code that you have that calls `interview_list()`.
+- The `get_user_list()` function now uses pagination and returns a
+  tuple instead of a list.  Note that this change is not
+  backwards-compatible, so you will need to change any code that you
+  have that calls `interview_list()`.
+- The `/api/interviews`, `/api/user/interviews`,
+  `/api/user/<user_id>/interviews`, and `/api/user_list` GET endpoints
+  of the API now use pagination and return a dictionary, not a list.
+  Note that this change is not backwards-compatible, so you will need
+  to change any code that you have that uses these APIs.
+- Removed the `PY2`, `string_types`, and `text_type` names from
+  `docassemble.base.util`.  Note that if you have used any of these,
+  this change may break your code.
+### Added
+- The `persistent` optional keyword parameter for
+  `mark_task_as_performed()` and related functions.
+- The `task_persistent` optional keyword parameter for `send_email()`,
+  `send_sms()`, and the `DAWeb` methods.
+### Fixed
+- Issue with encryption in functions launched during the loading of
+  the first page of an interview session.
+- Issue with multi-server configurations and the order in which
+  container software is updated that can result in some containers
+  unable to start.
+
+## [1.1.43] - 2020-06-30
+### Changed
+- The `complete_elements()` method now returns a `DAList`.  Note that
+  this may break existing code that uses `complete_elements()`.  To
+  get a plain list of the complete elements, use
+  `complete_elements().elements`.
+- Spanish ordinal numbers removed.
+- Upgraded jQuery and jQuery Validation Plugin.
+### Fixed
+- Possible fix to iframe reloading issue.
+
+## [1.1.42] - 2020-06-25
+### Added
+- Aliases for JavaScript functions that have the `da` prefix.
+### Fixed
+- Jinja2 filter was converting Python built-in types to strings.
+
+## [1.1.41] - 2020-06-22
+### Fixed
+- Bug in `recursive_eval_textobject()`.
+
+## [1.1.40] - 2020-06-19
+### Added
+- `question metadata`, `field metadata`, and the `send question data`
+  option under `features`.
+- The `country` keyword parameter for `.sms_number()`.
+- The `field` keyword parameter for `validation_error()`.
+
+## [1.1.39] - 2020-06-17
+### Fixed
+- Issue with `interview_url_action()` and `force_ask()`.
+- Upgraded `docxtpl` and `docx`.
+
+## [1.1.38] - 2020-06-11
+### Added
+- The `add another label` option for `list collect`.
+- The `manual_line_breaks` Jinja2 filter.
+### Changed
+- The `.all_false()` and related `DADict` methods reflect Python
+  notions of true and false values rather than literal equivalence of
+  the values to `True` or `False`.
+- Sessions that were created using the API will now appear immediately
+  in My Interviews.
+
+## [1.1.37] - 2020-06-10
+### Fixed
+- Attempt to force reinstall of pdfminer.six.
+
+## [1.1.36] - 2020-06-10
+### Fixed
+- Another attempt to force uninstall of pdfminer3k.
+
+## [1.1.35] - 2020-06-08
+### Fixed
+- Force uninstall of pdfminer3k.
+
+## [1.1.34] - 2020-06-08
+### Fixed
+- Error with `objects_from_file()`.
+
+## [1.1.33] - 2020-06-04
+### Changed
+- `help` can be added to `note` and `html` fields.
+### Fixed
+- Support for icons in terms.
+
+## [1.1.32] - 2020-05-30
+### Fixed
+- Issue with `objects_from_file()`.
+
+## [1.1.31] - 2020-05-29
+### Fixed
+- Issue with nested question file inclusion change in 1.1.30.
+
+## [1.1.30] - 2020-05-29
+### Fixed
+- Issue with screen reader and labels containing HTML codes.
+- Issue with nested question file inclusion.
+
+## [1.1.29] - 2020-05-27
+### Fixed
+- Issue with `set_save_status()`.
+- Issue with checkbox validation text when the "none of the above"
+  choice contained HTML.
+- Bug prevented `admin` users from changing other users' information
+  with the API.
+
+## [1.1.28] - 2020-05-21
+### Added
+- The `skip undefined` option for `pdf template file`
+### Fixed
+- Issue with nested `datatype: object` fields in a `list collect`.
+- Issue with `disable others` referring to a list in a `list collect`.
+
+## [1.1.27] - 2020-05-19
+### Fixed
+- Issue with `js show if` and `list collect`.
+
 ## [1.1.26] - 2020-05-17
 ### Fixed
 - Duplicative `under` text when `attachment` is used.

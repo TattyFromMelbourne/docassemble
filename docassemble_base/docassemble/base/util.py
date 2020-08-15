@@ -6,7 +6,6 @@ import time
 import pytz
 import yaml
 import zipfile
-from six import string_types, text_type, PY2
 import collections.abc as abc
 from PIL import Image, ImageEnhance
 from twilio.rest import Client as TwilioRestClient
@@ -22,7 +21,7 @@ import docassemble.base.pandoc
 import docassemble.base.pdftk
 import docassemble.base.file_docx
 from docassemble.base.file_docx import include_docx_template
-from docassemble.base.functions import alpha, roman, item_label, comma_and_list, get_language, set_language, get_dialect, set_country, get_country, word, comma_list, ordinal, ordinal_number, need, nice_number, quantity_noun, possessify, verb_past, verb_present, noun_plural, noun_singular, space_to_underscore, force_ask, force_gather, period_list, name_suffix, currency_symbol, currency, indefinite_article, nodoublequote, capitalize, title_case, url_of, do_you, did_you, does_a_b, did_a_b, were_you, was_a_b, have_you, has_a_b, your, her, his, their, is_word, get_locale, set_locale, process_action, url_action, get_info, set_info, get_config, prevent_going_back, qr_code, action_menu_item, from_b64_json, defined, define, value, message, response, json_response, command, single_paragraph, quote_paragraphs, location_returned, location_known, user_lat_lon, interview_url, interview_url_action, interview_url_as_qr, interview_url_action_as_qr, interview_email, get_emails, this_thread, static_image, action_arguments, action_argument, language_functions, language_function_constructor, get_default_timezone, user_logged_in, interface, user_privileges, user_has_privilege, user_info, task_performed, task_not_yet_performed, mark_task_as_performed, times_task_performed, set_task_counter, background_action, background_response, background_response_action, background_error_action, us, set_live_help_status, chat_partners_available, phone_number_in_e164, phone_number_formatted, phone_number_is_valid, countries_list, country_name, write_record, read_records, delete_record, variables_as_json, all_variables, server, language_from_browser, device, plain, bold, italic, states_list, state_name, subdivision_type, indent, raw, fix_punctuation, set_progress, get_progress, referring_url, undefine, invalidate, dispatch, yesno, noyes, split, showif, showifdef, phone_number_part, set_parts, log, encode_name, decode_name, interview_list, interview_menu, server_capabilities, session_tags, get_chat_log, get_user_list, get_user_info, set_user_info, get_user_secret, create_user, get_session_variables, set_session_variables, get_question_data, go_back_in_session, manage_privileges, salutation, redact, ensure_definition, forget_result_of, re_run_logic, reconsider, set_title, set_save_status, single_to_double_newlines, CustomDataType, verbatim, add_separators, update_ordinal_numbers, update_ordinal_function, update_language_function, update_nice_numbers, update_word_collection
+from docassemble.base.functions import alpha, roman, item_label, comma_and_list, get_language, set_language, get_dialect, set_country, get_country, word, comma_list, ordinal, ordinal_number, need, nice_number, quantity_noun, possessify, verb_past, verb_present, noun_plural, noun_singular, space_to_underscore, force_ask, force_gather, period_list, name_suffix, currency_symbol, currency, indefinite_article, nodoublequote, capitalize, title_case, url_of, do_you, did_you, does_a_b, did_a_b, were_you, was_a_b, have_you, has_a_b, your, her, his, their, is_word, get_locale, set_locale, process_action, url_action, get_info, set_info, get_config, prevent_going_back, qr_code, action_menu_item, from_b64_json, defined, define, value, message, response, json_response, command, single_paragraph, quote_paragraphs, location_returned, location_known, user_lat_lon, interview_url, interview_url_action, interview_url_as_qr, interview_url_action_as_qr, interview_email, get_emails, this_thread, static_image, action_arguments, action_argument, language_functions, language_function_constructor, get_default_timezone, user_logged_in, interface, user_privileges, user_has_privilege, user_info, background_action, background_response, background_response_action, background_error_action, us, set_live_help_status, chat_partners_available, phone_number_in_e164, phone_number_formatted, phone_number_is_valid, countries_list, country_name, write_record, read_records, delete_record, variables_as_json, all_variables, server, language_from_browser, device, plain, bold, italic, states_list, state_name, subdivision_type, indent, raw, fix_punctuation, set_progress, get_progress, referring_url, undefine, invalidate, dispatch, yesno, noyes, split, showif, showifdef, phone_number_part, set_parts, log, encode_name, decode_name, interview_list, interview_menu, server_capabilities, session_tags, get_chat_log, get_user_list, get_user_info, set_user_info, get_user_secret, create_user, create_session, get_session_variables, set_session_variables, get_question_data, go_back_in_session, manage_privileges, salutation, redact, ensure_definition, forget_result_of, re_run_logic, reconsider, set_title, set_save_status, single_to_double_newlines, CustomDataType, verbatim, add_separators, update_ordinal_numbers, update_ordinal_function, update_language_function, update_nice_numbers, update_word_collection, store_variables_snapshot, get_uid
 from docassemble.base.core import DAObject, DAList, DADict, DAOrderedDict, DASet, DAFile, DAFileCollection, DAStaticFile, DAFileList, DAEmail, DAEmailRecipient, DAEmailRecipientList, DATemplate, DAEmpty, DALink, selections, objects_from_file, RelationshipTree, DAContext, DACatchAll
 from decimal import Decimal
 import sys
@@ -259,6 +258,7 @@ __all__ = [
     'set_user_info',
     'get_user_secret',
     'create_user',
+    'create_session',
     'get_session_variables',
     'set_session_variables',
     'go_back_in_session',
@@ -275,9 +275,6 @@ __all__ = [
     'url_ask',
     'overlay_pdf',
     'get_question_data',
-    'text_type',
-    'string_types',
-    'PY2',
     'set_title',
     'set_save_status',
     'single_to_double_newlines',
@@ -298,7 +295,8 @@ __all__ = [
     're',
     'iso_country',
     'assemble_docx',
-    'docx_concatenate'
+    'docx_concatenate',
+    'store_variables_snapshot'
 ]
 
 #knn_machine_learner = DummyObject
@@ -319,6 +317,8 @@ class DAStore(DAObject):
                 return False
             if self.base == 'user':
                 return True
+            if self.base == 'session':
+                return True
             if self.base == 'global':
                 return False
             return False
@@ -329,6 +329,8 @@ class DAStore(DAObject):
                 return 'da:i:' + this_thread.current_info.get('yaml_filename', '')
             if self.base == 'user':
                 return 'da:userid:' + str(this_thread.current_info['user']['the_user_id'])
+            if self.base == 'session':
+                return 'da:uid:' + get_uid() + ':i:' + this_thread.current_info.get('yaml_filename', '')
             if self.base == 'global':
                 return 'da:global'
             return str(self.base)
@@ -383,6 +385,14 @@ class DAWeb(DAObject):
         if not isinstance(task, str):
             raise Exception("DAWeb.call: task must be a string")
         return task
+    def _get_task_persistent(self, task_persistent):
+        if task_persistent is None and hasattr(self, 'task_persistent'):
+            task_persistent = self.task_persistent
+        if task_persistent is None:
+            return False
+        if not isinstance(task, bool):
+            raise Exception("DAWeb.call: task_persistent must be boolean")
+        return task_persistent
     def _get_auth(self, auth):
         if auth is None and hasattr(self, 'auth'):
             auth = self.auth
@@ -418,8 +428,9 @@ class DAWeb(DAObject):
         if hasattr(self, 'json_body'):
             return True if self.json_body else False
         return True
-    def _call(self, url, method=None, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, task=None, files=None, cookies=None, success_code=None):
+    def _call(self, url, method=None, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, task=None, task_persistent=None, files=None, cookies=None, success_code=None):
         task = self._get_task(task)
+        task_persistent = self._get_task_persistent(task_persistent)
         auth = self._get_auth(auth)
         json_body = self._get_json_body(json_body)
         on_failure = self._get_on_failure(on_failure)
@@ -534,7 +545,7 @@ class DAWeb(DAObject):
                 r = requests.head(url, params=params, headers=headers, auth=auth, cookies=cookies)
         except RequestException as err:
             if on_failure == 'raise':
-                raise DAWebError(url=url, method=method, params=params, headers=headers, data=data, task=task, status_code=-1, response_text='', response_json=None, response_headers=dict(), exception_type=err.__class__.__name__, exception_text=str(err), cookies_before=cookies, cookies_after=None)
+                raise DAWebError(url=url, method=method, params=params, headers=headers, data=data, task=task, task_persistent=task_persistent, status_code=-1, response_text='', response_json=None, response_headers=dict(), exception_type=err.__class__.__name__, exception_text=str(err), cookies_before=cookies, cookies_after=None)
             else:
                 return on_failure
         if success_code is None:
@@ -554,39 +565,39 @@ class DAWeb(DAObject):
         except:
             json_response = None
         if success and task is not None:
-            mark_task_as_performed(task)
+            mark_task_as_performed(task, persistent=task_persistent)
         if not success:
             if on_failure == 'raise':
-                raise DAWebError(url=url, method=method, params=params, headers=headers, data=data, task=task, status_code=r.status_code, response_text=r.text, response_json=json_response, response_headers=r.headers, exception_type=None, exception_text=None, cookies_before=cookies, cookies_after=dict(r.cookies), success=success)
+                raise DAWebError(url=url, method=method, params=params, headers=headers, data=data, task=task, task_persistent=task_persistent, status_code=r.status_code, response_text=r.text, response_json=json_response, response_headers=r.headers, exception_type=None, exception_text=None, cookies_before=cookies, cookies_after=dict(r.cookies), success=success)
             else:
                 return on_failure
         if success and on_success is not None:
             if on_success == 'raise':
-                raise DAWebError(url=url, method=method, params=params, headers=headers, data=data, task=task, status_code=r.status_code, response_text=r.text, response_json=json_response, response_headers=r.headers, exception_type=None, exception_text=None, cookies_before=cookies, cookies_after=dict(r.cookies), success=success)
+                raise DAWebError(url=url, method=method, params=params, headers=headers, data=data, task=task, task_persistent=task_persistent, status_code=r.status_code, response_text=r.text, response_json=json_response, response_headers=r.headers, exception_type=None, exception_text=None, cookies_before=cookies, cookies_after=dict(r.cookies), success=success)
             else:
                 return on_success
         return(json_response if json_response is not None else r.text)
-    def get(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None):
+    def get(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None):
         """Makes a GET request"""
-        return self._call(url, method='GET', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task)
-    def post(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, files=None):
+        return self._call(url, method='GET', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent)
+    def post(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None, files=None):
         """Makes a POST request"""
-        return self._call(url, method='POST', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, files=files)
-    def put(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, files=None):
+        return self._call(url, method='POST', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent, files=files)
+    def put(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None, files=None):
         """Makes a PUT request"""
-        return self._call(url, method='PUT', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, files=files)
-    def patch(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, files=None):
+        return self._call(url, method='PUT', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent, files=files)
+    def patch(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None, files=None):
         """Makes a PATCH request"""
-        return self._call(url, method='PATCH', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, files=files)
-    def delete(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None):
+        return self._call(url, method='PATCH', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent, files=files)
+    def delete(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None):
         """Makes a DELETE request"""
-        return self._call(url, method='DELETE', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task)
-    def options(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None):
+        return self._call(url, method='DELETE', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent)
+    def options(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None):
         """Makes an OPTIONS request"""
-        return self._call(url, method='OPTIONS', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task)
-    def head(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None):
+        return self._call(url, method='OPTIONS', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent)
+    def head(self, url, data=None, params=None, headers=None, json_body=None, on_failure=None, on_success=None, auth=None, cookies=None, task=None, task_persistent=None):
         """Makes a HEAD request"""
-        return self._call(url, method='HEAD', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task)
+        return self._call(url, method='HEAD', data=data, params=params, headers=headers, json_body=json_body, on_failure=on_failure, on_success=on_success, auth=auth, cookies=cookies, task=task, task_persistent=task_persistent)
 
 class DARedis(DAObject):
     """A class used to interact with the redis server."""
@@ -1341,7 +1352,7 @@ class Address(DAObject):
         return super().init(*pargs, **kwargs)
     def __str__(self):
         return(str(self.block()))
-    def on_one_line(self, include_unit=False, omit_default_country=True, language=None, show_country=None):
+    def on_one_line(self, include_unit=True, omit_default_country=True, language=None, show_country=None):
         """Returns a one-line address.  Primarily used internally for geolocation."""
         output = ""
         if self.city_only is False:
@@ -1387,7 +1398,7 @@ class Address(DAObject):
         if address is None:
             if self.geolocated:
                 return self.geolocate_success
-            the_address = self.on_one_line(include_unit=True, omit_default_country=False)
+            the_address = self.on_one_line(omit_default_country=False)
         else:
             the_address = address
         #logmessage("geolocate: trying to geolocate " + str(the_address))
@@ -1830,7 +1841,7 @@ class Person(DAObject):
             return(self.name.full() + '</w:t><w:br/><w:t xml:space="preserve">' + self.address.block(language=language))
         else:
             return("[FLUSHLEFT] " + self.name.full() + " [NEWLINE] " + self.address.block(language=language))
-    def sms_number(self):
+    def sms_number(self, country=None):
         """Returns the person's mobile_number, if defined, otherwise the phone_number."""
         if hasattr(self, 'mobile_number'):
             the_number = self.mobile_number
@@ -1838,13 +1849,14 @@ class Person(DAObject):
                 the_number = 'whatsapp:' + str(self.mobile_number)
         else:
             the_number = self.phone_number
-        if hasattr(self, 'country'):
-            the_country = self.country
-        elif hasattr(self, 'address') and hasattr(self.address, 'country'):
-            the_country = self.address.country
-        else:
-            the_country = get_country()
-        return phone_number_in_e164(the_number, country=the_country)
+        if country is None:
+            if hasattr(self, 'country'):
+                country = self.country
+            elif hasattr(self, 'address') and hasattr(self.address, 'country'):
+                country = self.address.country
+            else:
+                country = get_country()
+        return phone_number_in_e164(the_number, country=country)
     def facsimile_number(self, country=None):
         """Returns the person's fax_number, formatted appropriately."""
         the_number = self.fax_number
@@ -1954,6 +1966,9 @@ class Individual(Person):
             self.name.uses_parts = False
             self.name.text = kwargs['name']
         return super().init(*pargs, **kwargs)
+    def familiar(self):
+        """Returns the individual's familiar name."""
+        return self.name.familiar()
     def get_parents(self, tree, create=False):
         return self.get_relation('child', tree, create=create)
     def get_spouse(self, tree, create=False):
@@ -2265,7 +2280,7 @@ def send_sms_invite(to=None, body='question', config='default'):
     #logmessage("Sending message " + str(message) + " to " + str(phone_number))
     send_sms(to=phone_number, body=message, config=config)
 
-def send_sms(to=None, body=None, template=None, task=None, attachments=None, config='default'):
+def send_sms(to=None, body=None, template=None, task=None, task_persistent=False, attachments=None, config='default', dry_run=False):
     """Sends a text message and returns whether sending the text was successful."""
     if server.twilio_config is None:
         logmessage("send_sms: ignoring because Twilio not enabled")
@@ -2289,8 +2304,8 @@ def send_sms(to=None, body=None, template=None, task=None, attachments=None, con
     if template is not None and body is None:
         body_html = '<html><body>'
         if template.subject is not None:
-            body_html += markdown_to_html(template.subject)
-        body_html += markdown_to_html(template.content) + '</body></html>'
+            body_html += markdown_to_html(template.subject, external=True)
+        body_html += markdown_to_html(template.content, external=True) + '</body></html>'
         body = BeautifulSoup(body_html, "html.parser").get_text('\n')
     if body is None:
         body = word("blank message")
@@ -2334,6 +2349,8 @@ def send_sms(to=None, body=None, template=None, task=None, attachments=None, con
     if len(media) > 10:
         logmessage("send_sms: more than 10 attachments were provided; not sending message")
         success = False
+    if dry_run:
+        success = False
     if success:
         twilio_client = TwilioRestClient(tconfig['account sid'], tconfig['auth token'])
         for recipient in to:
@@ -2352,9 +2369,8 @@ def send_sms(to=None, body=None, template=None, task=None, attachments=None, con
                     logmessage("send_sms: failed to send message from " + from_number + " to " + phone_number + ": " + str(errstr))
                     return False
     if success and task is not None:
-        mark_task_as_performed(task)
+        mark_task_as_performed(task, persistent=task_persistent)
     return True
-
 
 class FaxStatus:
     def __init__(self, sid):
@@ -2405,7 +2421,7 @@ def send_fax(fax_number, file_object, config='default', country=None):
         return FaxStatus(None)
     return FaxStatus(server.send_fax(fax_string(fax_number, country=country), file_object, config))
 
-def send_email(to=None, sender=None, cc=None, bcc=None, body=None, html=None, subject="", template=None, task=None, attachments=None, mailgun_variables=None):
+def send_email(to=None, sender=None, cc=None, bcc=None, body=None, html=None, subject="", template=None, task=None, task_persistent=False, attachments=None, mailgun_variables=None, dry_run=False):
     """Sends an e-mail and returns whether sending the e-mail was successful."""
     if attachments is None:
         attachments = []
@@ -2419,7 +2435,7 @@ def send_email(to=None, sender=None, cc=None, bcc=None, body=None, html=None, su
     if template is not None:
         if subject is None or subject == '':
             subject = template.subject
-        body_html = '<html><body>' + markdown_to_html(template.content) + '</body></html>'
+        body_html = '<html><body>' + template.content_as_html(external=True) + '</body></html>'
         if body is None:
             body = BeautifulSoup(body_html, "html.parser").get_text('\n')
         if html is None:
@@ -2497,6 +2513,8 @@ def send_email(to=None, sender=None, cc=None, bcc=None, body=None, html=None, su
                             success = False
                     else:
                         success = False
+    if dry_run:
+        success = False
     if success:
         try:
             logmessage("send_email: starting to send")
@@ -2506,7 +2524,7 @@ def send_email(to=None, sender=None, cc=None, bcc=None, body=None, html=None, su
             logmessage("send_email: sending mail failed with error of " + " type " + str(errmess.__class__.__name__) + ": " + str(errmess))
             success = False
     if success and task is not None:
-        mark_task_as_performed(task)
+        mark_task_as_performed(task, persistent=task_persistent)
     return(success)
 
 def attachment_name(filename, filenames):
@@ -2539,7 +2557,7 @@ def map_of(*pargs, **kwargs):
                     if 'icon' in marker and not isinstance(marker['icon'], dict):
                         marker['icon'] = {'url': server.url_finder(marker['icon'])}
                     if 'info' in marker and marker['info']:
-                        marker['info'] = markdown_to_html(marker['info'], trim=True)
+                        marker['info'] = markdown_to_html(marker['info'], trim=True, external=True)
                     the_map['markers'].append(marker)
     if 'center' in kwargs:
         the_center = kwargs['center']
@@ -2954,9 +2972,12 @@ def zip_file(*pargs, **kwargs):
     zip_file.commit()
     return zip_file
 
-def validation_error(message):
-    """Raises a validation error with a given message"""
-    raise DAValidationError(message)
+def validation_error(message, field=None):
+    """Raises a validation error with a given message, optionally
+    associated with a field.
+
+    """
+    raise DAValidationError(message, field=field)
 
 def invalid_variable_name(varname):
     if not isinstance(varname, str):
@@ -3240,3 +3261,80 @@ def assemble_docx(input_file, fields=None, output_path=None, output_format='docx
         return output_path
 
 from docassemble.base.oauth import DAOAuth
+
+def variables_snapshot_connection():
+    return server.variables_snapshot_connection()
+
+def get_persistent_task_store(persistent):
+    if persistent is True:
+        base = 'session'
+    else:
+        base = persistent
+    if base == 'session':
+        encrypted = this_thread.current_info.get('encrypted', True)
+        store = DAStore('store', base=base, encrypted=encrypted)
+    else:
+        store = DAStore('store', base=base)
+    if not store.defined('tasks'):
+        store.set('tasks', dict())
+    return store
+
+def task_performed(task, persistent=False):
+    """Returns True if the task has been performed at least once, otherwise False."""
+    ensure_definition(task)
+    if persistent:
+        store = get_persistent_task_store(persistent)
+        tasks = store.get('tasks')
+        if task in tasks and tasks[task]:
+            return True
+        return False
+    if task in this_thread.internal['tasks'] and this_thread.internal['tasks'][task]:
+        return True
+    return False
+
+def task_not_yet_performed(task, persistent=False):
+    """Returns True if the task has never been performed, otherwise False."""
+    ensure_definition(task)
+    if task_performed(task, persistent=persistent):
+        return False
+    return True
+
+def mark_task_as_performed(task, persistent=False):
+    """Increases by 1 the number of times the task has been performed."""
+    ensure_definition(task)
+    if persistent:
+        store = get_persistent_task_store(persistent)
+        tasks = store.get('tasks')
+        if not task in tasks:
+            tasks[task] = 0
+        tasks[task] += 1
+        store.set('tasks', tasks)
+        return tasks[task]
+    if not task in this_thread.internal['tasks']:
+        this_thread.internal['tasks'][task] = 0
+    this_thread.internal['tasks'][task] += 1
+    return this_thread.internal['tasks'][task]
+
+def times_task_performed(task, persistent=False):
+    """Returns the number of times the task has been performed."""
+    ensure_definition(task)
+    if persistent:
+        store = get_persistent_task_store(persistent)
+        tasks = store.get('tasks')
+        if not task in tasks:
+            return 0
+        return tasks[task]
+    if not task in this_thread.internal['tasks']:
+        return 0
+    return this_thread.internal['tasks'][task]
+
+def set_task_counter(task, times, persistent=False):
+    """Allows you to manually set the number of times the task has been performed."""
+    ensure_definition(task, times)
+    if persistent:
+        store = get_persistent_task_store(persistent)
+        tasks = store.get('tasks')
+        tasks[task] = times
+        store.set('tasks', tasks)
+        return
+    this_thread.internal['tasks'][task] = times

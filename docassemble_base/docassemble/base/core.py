@@ -64,13 +64,15 @@ def get_unique_name():
 
 class DAEmpty:
     """An object that does nothing except avoid triggering errors about missing information."""
+    def __init__(self, *pargs, **kwargs):
+        self.str = str(kwargs.get('str', ''))
     def __getattr__(self, thename):
         if thename.startswith('_'):
             return object.__getattribute__(self, thename)
         else:
             return DAEmpty()
     def __str__(self):
-        return ''
+        return self.str
     def __dir__(self):
         return list()
     def __contains__(self, item):
@@ -260,6 +262,9 @@ class DAObject:
         self.instanceName = get_unique_name()
         self.has_nonrandom_instance_name = False
         return self
+    def attr_name(self, attr):
+        """Returns a variable name for an attribute, suitable for use in force_ask() and other functions."""
+        return self.instanceName + '.' + attr
     def delattr(self, *pargs):
         """Deletes attributes."""
         for attr in pargs:
@@ -511,10 +516,11 @@ class DAObject:
         """Returns a possessive phrase based on the instanceName.  E.g., client.object_possessive('fish') returns
         "client's fish." """
         language = kwargs.get('language', None)
+        capitalize = kwargs.get('capitalize', False)
         if len(self.instanceName.split(".")) > 1:
             return(possessify_long(self.object_name(), target, language=language))
         else:
-            return(possessify(the(self.object_name(), language=language), target, language=language))
+            return(possessify(the(self.object_name(), language=language), target, language=language, capitalize=capitalize))
     def initializeAttribute(self, *pargs, **kwargs):
         """Defines an attribute for the object, setting it to a newly initialized object.
         The first argument is the name of the attribute and the second argument is type
@@ -1096,6 +1102,9 @@ class DAList(DAObject):
         if hasattr(self, 'doing_gathered_and_complete'):
             del self.doing_gathered_and_complete
         return True
+    def copy(self):
+        """Returns a copy of the list."""
+        return self.elements.copy()
     def filter(self, *pargs, **kwargs):
         """Returns a filtered version of the list containing only items with particular values of attributes."""
         self._trigger_gather()
@@ -1425,15 +1434,15 @@ class DAList(DAObject):
         if len(self.elements) == 0:
             return 0
         return len(self.elements) - 1
-    def number_as_word(self, language=None):
+    def number_as_word(self, language=None, capitalize=False):
         """Returns the number of elements in the list, spelling out the number if ten
         or below.  Forces the gathering of the elements if necessary."""
-        return nice_number(self.number(), language=language)
+        return nice_number(self.number(), language=language, capitalize=capitalize)
     def complete_elements(self, complete_attribute=None):
         """Returns a list of the elements that are complete."""
         if complete_attribute is None and hasattr(self, 'complete_attribute'):
             complete_attribute = self.complete_attribute
-        items = list()
+        items = DAList(self.instanceName)
         for item in self.elements:
             if item is None:
                 continue
@@ -1446,6 +1455,7 @@ class DAList(DAObject):
                 except:
                     continue
             items.append(item)
+        items.gathered = True
         return items
     def _validate(self, item_object_type, complete_attribute):
         if self.ask_object_type:
@@ -1903,9 +1913,9 @@ class DADict(DAObject):
                 value._reset_gathered_recursively()
         return super()._reset_gathered_recursively()
     def all_false(self, *pargs, **kwargs):
-        """Returns True if the values of all keys are False.  If one or more
+        """Returns True if the values of all keys are false.  If one or more
         keys are provided as arguments, returns True if all of the
-        values of those keys are False.  If the optional keyword
+        values of those keys are false.  If the optional keyword
         argument 'exclusive' is True, returns True only if those keys
         are the only false values.
 
@@ -1919,7 +1929,7 @@ class DADict(DAObject):
                 the_list.append(parg)
         if len(the_list) == 0:
             for key, value in self._sorted_elements_items():
-                if value is not False:
+                if value:
                     return False
             self._trigger_gather()
             return True
@@ -1928,10 +1938,10 @@ class DADict(DAObject):
                 return False
         for key, value in self._sorted_elements_items():
             if key in the_list:
-                if value is not False:
+                if value:
                     return False
             else:
-                if exclusive and value is False:
+                if exclusive and not value:
                     return False
         self._trigger_gather()
         return True
@@ -1942,9 +1952,9 @@ class DADict(DAObject):
         """Returns the opposite of all_true()."""
         return not self.all_true(*pargs, **kwargs)
     def all_true(self, *pargs, **kwargs):
-        """Returns True if the values of all keys are True.  If one or more
+        """Returns True if the values of all keys are true.  If one or more
         keys are provided as arguments, returns True if all of the
-        values of those keys are True.  If the optional keyword
+        values of those keys are true.  If the optional keyword
         argument 'exclusive' is True, returns True only if those keys
         are the only true values.
 
@@ -1958,7 +1968,7 @@ class DADict(DAObject):
                 the_list.append(parg)
         if len(the_list) == 0:
             for key, value in self._sorted_elements_items():
-                if value is not True:
+                if not value:
                     return False
             self._trigger_gather()
             return True
@@ -1967,19 +1977,19 @@ class DADict(DAObject):
                 return False
         for key, value in self._sorted_elements_items():
             if key in the_list:
-                if value is not True:
+                if not value:
                     return False
             else:
-                if exclusive and value is True:
+                if exclusive and value:
                     return False
         self._trigger_gather()
         return True
     def true_values(self):
-        """Returns the keys for which the corresponding value is True."""
-        return DAList(elements=[key for key, value in self._sorted_items() if value is True])
+        """Returns the keys for which the corresponding value is true."""
+        return DAList(elements=[key for key, value in self._sorted_items() if value])
     def false_values(self):
-        """Returns the keys for which the corresponding value is False."""
-        return DAList(elements=[key for key, value in self._sorted_items() if value is False])
+        """Returns the keys for which the corresponding value is false."""
+        return DAList(elements=[key for key, value in self._sorted_items() if not value])
     def _sorted_items(self):
         return sorted(self.items())
     def _sorted_elements_items(self):
@@ -3555,6 +3565,7 @@ class DAFileCollection(DAObject):
     """
     def init(self, *pargs, **kwargs):
         self.info = dict()
+        super().init(*pargs, **kwargs)
     def _extension_list(self):
         if hasattr(self, 'info') and 'formats' in self.info:
             return self.info['formats']
@@ -4240,8 +4251,13 @@ def selections(*pargs, **kwargs):
         if isinstance(arg, DAList):
             arg._trigger_gather()
             the_list = arg.elements
-        elif type(arg) is list:
+        elif isinstance(arg, DASet):
+            arg._trigger_gather()
+            the_list = list(arg.elements)
+        elif isinstance(arg, list):
             the_list = arg
+        elif isinstance(arg, set):
+            the_list = list(arg)
         else:
             the_list = [arg]
         for subarg in the_list:
@@ -4276,7 +4292,7 @@ def setify(item, output=set()):
         output.add(item)
     return output
 
-def objects_from_file(file_ref, recursive=True, gathered=True, name=None, use_objects=False):
+def objects_from_file(file_ref, recursive=True, gathered=True, name=None, use_objects=False, package=None):
     """A utility function for initializing a group of objects from a YAML file written in a certain format."""
     #from docassemble.base.core import DAObject, DAList, DADict, DASet
     if isinstance(file_ref, DAFileCollection):
@@ -4299,7 +4315,9 @@ def objects_from_file(file_ref, recursive=True, gathered=True, name=None, use_ob
     else:
         thename = name
     #logmessage("objects_from_file: thename is " + str(thename))
-    file_info = server.file_finder(file_ref, folder='sources')
+    if package is None and docassemble.base.functions.this_thread.current_question is not None:
+        package = docassemble.base.functions.this_thread.current_question.package
+    file_info = server.file_finder(file_ref, folder='sources', package=package)
     if file_info is None or 'path' not in file_info:
         raise SystemError('objects_from_file: file reference ' + str(file_ref) + ' not found')
     if thename is None:

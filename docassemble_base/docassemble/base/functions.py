@@ -1,5 +1,4 @@
 import types
-from six import string_types, text_type, PY2
 import markdown
 from mdx_smartypants import SmartypantsExt
 import pattern.en
@@ -18,20 +17,15 @@ import mimetypes
 import pkg_resources
 import titlecase
 from docassemble.base.logger import logmessage
-from docassemble.base.error import ForcedNameError, QuestionError, ResponseError, CommandError, BackgroundResponseError, BackgroundResponseActionError, ForcedReRun
+from docassemble.base.error import ForcedNameError, QuestionError, ResponseError, CommandError, BackgroundResponseError, BackgroundResponseActionError, ForcedReRun, DAError
 from docassemble.base.generate_key import random_string
 import locale
 import decimal
 import docassemble.base.astparser
-if PY2:
-    from urllib import quote as urllibquote
-    FileType = file
-    equals_byte = '='
-else:
-    from urllib.parse import quote as urllibquote
-    from io import IOBase
-    FileType = IOBase
-    equals_byte = bytes('=', 'utf-8')
+from urllib.parse import quote as urllibquote
+from io import IOBase
+FileType = IOBase
+equals_byte = bytes('=', 'utf-8')
 import codecs
 import copy
 import base64
@@ -53,7 +47,7 @@ TypeType = type(type(None))
 locale.setlocale(locale.LC_ALL, '')
 contains_volatile = re.compile('^(x\.|x\[|.*\[[ijklmn]\])')
 
-__all__ = ['alpha', 'roman', 'item_label', 'ordinal', 'ordinal_number', 'comma_list', 'word', 'get_language', 'set_language', 'get_dialect', 'set_country', 'get_country', 'get_locale', 'set_locale', 'comma_and_list', 'need', 'nice_number', 'quantity_noun', 'currency_symbol', 'verb_past', 'verb_present', 'noun_plural', 'noun_singular', 'indefinite_article', 'capitalize', 'space_to_underscore', 'force_ask', 'period_list', 'name_suffix', 'currency', 'static_image', 'title_case', 'url_of', 'process_action', 'url_action', 'get_info', 'set_info', 'get_config', 'prevent_going_back', 'qr_code', 'action_menu_item', 'from_b64_json', 'defined', 'value', 'message', 'response', 'json_response', 'command', 'background_response', 'background_response_action', 'single_paragraph', 'quote_paragraphs', 'location_returned', 'location_known', 'user_lat_lon', 'interview_url', 'interview_url_action', 'interview_url_as_qr', 'interview_url_action_as_qr', 'interview_email', 'get_emails', 'action_arguments', 'action_argument', 'get_default_timezone', 'user_logged_in', 'user_privileges', 'user_has_privilege', 'user_info', 'task_performed', 'task_not_yet_performed', 'mark_task_as_performed', 'times_task_performed', 'set_task_counter', 'background_action', 'background_response', 'background_response_action', 'us', 'set_live_help_status', 'chat_partners_available', 'phone_number_in_e164', 'phone_number_formatted', 'phone_number_is_valid', 'countries_list', 'country_name', 'write_record', 'read_records', 'delete_record', 'variables_as_json', 'all_variables', 'language_from_browser', 'device', 'plain', 'bold', 'italic', 'subdivision_type', 'indent', 'raw', 'fix_punctuation', 'set_progress', 'get_progress', 'referring_url', 'undefine', 'invalidate', 'dispatch', 'yesno', 'noyes', 'phone_number_part', 'log', 'encode_name', 'decode_name', 'interview_list', 'interview_menu', 'server_capabilities', 'session_tags', 'get_chat_log', 'get_user_list', 'get_user_info', 'set_user_info', 'get_user_secret', 'create_user', 'get_session_variables', 'set_session_variables', 'go_back_in_session', 'manage_privileges', 'redact', 'forget_result_of', 're_run_logic', 'reconsider', 'get_question_data', 'text_type', 'string_types', 'PY2', 'set_save_status', 'single_to_double_newlines', 'verbatim', 'add_separators']
+__all__ = ['alpha', 'roman', 'item_label', 'ordinal', 'ordinal_number', 'comma_list', 'word', 'get_language', 'set_language', 'get_dialect', 'set_country', 'get_country', 'get_locale', 'set_locale', 'comma_and_list', 'need', 'nice_number', 'quantity_noun', 'currency_symbol', 'verb_past', 'verb_present', 'noun_plural', 'noun_singular', 'indefinite_article', 'capitalize', 'space_to_underscore', 'force_ask', 'period_list', 'name_suffix', 'currency', 'static_image', 'title_case', 'url_of', 'process_action', 'url_action', 'get_info', 'set_info', 'get_config', 'prevent_going_back', 'qr_code', 'action_menu_item', 'from_b64_json', 'defined', 'value', 'message', 'response', 'json_response', 'command', 'background_response', 'background_response_action', 'single_paragraph', 'quote_paragraphs', 'location_returned', 'location_known', 'user_lat_lon', 'interview_url', 'interview_url_action', 'interview_url_as_qr', 'interview_url_action_as_qr', 'interview_email', 'get_emails', 'action_arguments', 'action_argument', 'get_default_timezone', 'user_logged_in', 'user_privileges', 'user_has_privilege', 'user_info', 'set_task_counter', 'background_action', 'background_response', 'background_response_action', 'us', 'set_live_help_status', 'chat_partners_available', 'phone_number_in_e164', 'phone_number_formatted', 'phone_number_is_valid', 'countries_list', 'country_name', 'write_record', 'read_records', 'delete_record', 'variables_as_json', 'all_variables', 'language_from_browser', 'device', 'plain', 'bold', 'italic', 'subdivision_type', 'indent', 'raw', 'fix_punctuation', 'set_progress', 'get_progress', 'referring_url', 'undefine', 'invalidate', 'dispatch', 'yesno', 'noyes', 'phone_number_part', 'log', 'encode_name', 'decode_name', 'interview_list', 'interview_menu', 'server_capabilities', 'session_tags', 'get_chat_log', 'get_user_list', 'get_user_info', 'set_user_info', 'get_user_secret', 'create_user', 'create_session', 'get_session_variables', 'set_session_variables', 'go_back_in_session', 'manage_privileges', 'redact', 'forget_result_of', 're_run_logic', 'reconsider', 'get_question_data', 'set_save_status', 'single_to_double_newlines', 'verbatim', 'add_separators', 'store_variables_snapshot']
 
 # debug = False
 # default_dialect = 'us'
@@ -240,6 +234,34 @@ def device(ip=False):
         response = None
     return response
 
+def parse_accept_language(language_header, restrict=True):
+    ok_languages = set()
+    for lang in word_collection.keys():
+        ok_languages.add(lang)
+    languages = list()
+    for item in language_header.split(','):
+        q = 1.0
+        lang = item.strip()
+        if ';' in lang:
+            parts = item.split(';')
+            lang = parts[0]
+            q = parts[1]
+            try:
+                q = float(re.sub(r'^q=', '', q, flags=re.IGNORECASE))
+            except:
+                q = 1.0
+
+        parts = re.split('-|_', lang)
+
+        languages.append([parts[0].strip().lower(), q])
+    output = list()
+    for item in sorted(languages, key=lambda y: y[1], reverse=True):
+        if restrict and item[0] not in ok_languages:
+            continue
+        if item[0] not in output:
+            output.append(item[0])
+    return output
+
 def language_from_browser(*pargs):
     """Attempts to determine the user's language based on information supplied by the user's web browser."""
     if len(pargs) > 0:
@@ -248,7 +270,11 @@ def language_from_browser(*pargs):
     else:
         restrict = False
     if 'headers' in this_thread.current_info:
-        langs = [entry.split(";")[0].strip() for entry in this_thread.current_info['headers'].get('Accept-Language', '').lower().split(",")]
+        language_header = this_thread.current_info['headers'].get('Accept-Language', None)
+        if language_header is not None:
+            langs = parse_accept_language(language_header, restrict=False)
+        else:
+            return None
     else:
         return None
     for lang in langs:
@@ -414,6 +440,10 @@ def user_info():
         user.last_name = word("User")
     user.session = get_uid()
     user.filename = this_thread.current_info.get('yaml_filename', None)
+    if user.filename:
+        user.package = re.sub(r':.*', '', user.filename)
+    else:
+        user.package = None
     return user
 
 def action_arguments():
@@ -720,6 +750,10 @@ def interview_url_action(action, **kwargs):
     if not do_local:
         args['_external'] = True
     url = url_of('interview', **args)
+    if 'temporary' in kwargs:
+        args['temporary'] = kwargs['temporary']
+    if 'once_temporary' in kwargs:
+        args['once_temporary'] = kwargs['once_temporary']
     if 'temporary' in args:
         if isinstance(args['temporary'], (int, float)) and args['temporary'] > 0:
             expire_seconds = int(args['temporary'] * 60 * 60)
@@ -975,19 +1009,6 @@ ordinal_numbers = {
         '9': 'ninth',
         '10': 'tenth'
     },
-    'es': {
-        '0': 'zeroth',
-        '1': 'primero',
-        '2': 'segundo',
-        '3': 'tercero',
-        '4': 'cuarto',
-        '5': 'quinto',
-        '6': 'sexto',
-        '7': 'séptimo',
-        '8': 'octavo',
-        '9': 'noveno',
-        '10': 'décimo'
-    }
 }
 
 nice_numbers = {
@@ -1019,19 +1040,6 @@ nice_numbers = {
     }
 }
 
-# def basic_url_of(*pargs, **kwargs):
-#     """Returns a URL to a file within a docassemble package."""
-#     return pargs[0]
-
-# the_url_func = basic_url_of
-
-# def url_of(*pargs, **kwargs):
-#     """Returns a URL to a file within a docassemble package."""
-#     return the_url_func(*pargs, **kwargs)
-
-# def basic_write_record(key, data):
-#     return None
-
 class WebFunc:
     pass
 server = WebFunc()
@@ -1039,92 +1047,94 @@ server = WebFunc()
 def null_func(*pargs, **kwargs):
     return None
 
-server.write_record = null_func
-server.read_records = null_func
-server.delete_record = null_func
-server.url_for = null_func
-server.generate_csrf = null_func
-server.bg_action = null_func
-server.worker_convert = null_func
-server.chat_partners_available = null_func
+server.SavedFile = null_func
 server.absolute_filename = null_func
-server.save_numbered_file = null_func
-server.send_mail = null_func
-server.file_finder = null_func
-server.url_finder = null_func
-server.user_id_dict = null_func
-server.get_user_object = null_func
-server.sms_body = null_func
-server.get_sms_session = null_func
-server.initiate_sms_session = null_func
-server.terminate_sms_session = null_func
+server.add_privilege = null_func
+server.add_user_privilege = null_func
+server.alchemy_url = null_func
 server.applock = null_func
+server.bg_action = null_func
+server.button_class_prefix = 'btn-'
+server.chat_partners_available = null_func
+server.chord = null_func
+server.create_user = null_func
+server.daconfig = dict()
 server.debug = False
+server.debug_status = False
+server.default_country = 'US'
 server.default_dialect = 'us'
 server.default_language = 'en'
 server.default_locale = 'US.utf8'
-server.default_country = 'US'
-server.server_redis = None
-server.server_redis_user = None
-server.twilio_config = dict()
-server.daconfig = dict()
 try:
     server.default_timezone = tzlocal.get_localzone().zone
 except:
     server.default_timezone = 'America/New_York'
-
-# class NullWebFunc:
-#     def write_record(*pargs, **kwargs):
-#         return None
-#     def read_records(*pargs, **kwargs):
-#         return None
-#     def delete_record(*pargs, **kwargs):
-#         return None
-#     def url_for(*pargs, **kwargs):
-#         return None
-#     def generate_csrf(*pargs, **kwargs):
-#         sys.stderr.write("Generating csrf\n")
-#         return None
-#     def bg_action(*pargs, **kwargs):
-#         return None
-#     def worker_convert(*pargs, **kwargs):
-#         return None
-#     def chat_partners(*pargs, **kwargs):
-#         return dict(peer=0, help=0)
-#     def absolute_filename(*pargs, **kwargs):
-#         return None
-#     def save_numbered_file(*pargs, **kwargs):
-#         return None
-#     def send_mail(*pargs, **kwargs):
-#         return None
-#     def absolute_filename(*pargs, **kwargs):
-#         return None
-#     def file_finder(*pargs, **kwargs):
-#         return None
-#     def url_finder(*pargs, **kwargs):
-#         return None
-#     def user_id_dict(*pargs, **kwargs):
-#         return None
-#     def __init__(self):
-#         self.debug = False
-#         self.default_dialect = 'us'
-#         self.default_language = 'en'
-#         self.default_locale = 'US.utf8'
-#         self.default_country = 'US'
-#         self.server_redis = None
-#         try:
-#             self.default_timezone = tzlocal.get_localzone().zone
-#         except:
-#             self.default_timezone = 'America/New_York'
-#         self.daconfig = dict()
-
-# write_record = server.write_record
-# read_records = server.read_records
-# delete_record = server.delete_record
-# url_of = server.url_finder
-# get_sms_session = server.get_sms_session
-# initiate_sms_session = server.initiate_sms_session
-# terminate_sms_session = server.terminate_sms_session
+server.delete_answer_json = null_func
+server.delete_record = null_func
+server.fg_make_pdf_for_word_path = null_func
+server.fg_make_png_for_pdf = null_func
+server.fg_make_png_for_pdf_path = null_func
+server.file_finder = null_func
+server.file_number_finder = null_func
+server.file_privilege_access = null_func
+server.file_set_attributes = null_func
+server.file_user_access = null_func
+server.fix_pickle_obj = null_func
+server.generate_csrf = null_func
+server.get_chat_log = null_func
+server.get_ext_and_mimetype = null_func
+server.get_new_file_number = null_func
+server.get_privileges_list = null_func
+server.get_question_data = null_func
+server.get_secret = null_func
+server.get_session_variables = null_func
+server.get_short_code = null_func
+server.get_sms_session = null_func
+server.get_user_info = null_func
+server.get_user_list = null_func
+server.get_user_object = null_func
+server.go_back_in_session = null_func
+server.hostname = 'localhost'
+server.initiate_sms_session = null_func
+server.interview_menu = null_func
+server.main_page_parts = dict()
+server.make_png_for_pdf = null_func
+server.make_user_inactive = null_func
+server.navigation_bar = null_func
+server.ocr_finalize = null_func
+server.ocr_page = null_func
+server.path_from_reference = null_func
+server.read_answer_json = null_func
+server.read_records = null_func
+server.remove_privilege = null_func
+server.remove_user_privilege = null_func
+server.retrieve_emails = null_func
+server.save_numbered_file = null_func
+server.send_fax = null_func
+server.send_mail = null_func
+server.server_redis = None
+server.server_redis_user = None
+server.server_sql_defined = null_func
+server.server_sql_delete = null_func
+server.server_sql_get = null_func
+server.server_sql_keys = null_func
+server.server_sql_set = null_func
+server.create_session = null_func
+server.set_session_variables = null_func
+server.set_user_info = null_func
+server.sms_body = null_func
+server.task_ready = null_func
+server.terminate_sms_session = null_func
+server.twilio_config = dict()
+server.url_finder = null_func
+server.url_for = null_func
+server.user_id_dict = null_func
+server.user_interviews = null_func
+server.variables_snapshot_connection = null_func
+server.wait_for_task = null_func
+server.worker_convert = null_func
+server.write_answer_json = null_func
+server.write_record = null_func
 
 def write_record(key, data):
     """Stores the data in a SQL database for later retrieval with the
@@ -1553,6 +1563,59 @@ def roman(num, case=None):
 def words():
     return word_collection[this_thread.language]
 
+class LazyWord:
+    def __init__(self, *args, **kwargs):
+        if len(kwargs):
+            self.original = args[0] % kwargs
+        else:
+            self.original = args[0]
+    def __mod__(self, other):
+        return word(self.original) % other
+    def __str__(self):
+        return word(self.original)
+
+class LazyArray:
+    def __init__(self, array):
+        self.original = array
+    def compute(self):
+        return [word(item) for item in self.original]
+    def copy(self):
+        return self.compute().copy()
+    def pop(self, *pargs):
+        return str(self.original.pop(*pargs))
+    def __add__(self, other):
+        return self.compute() + other
+    def index(self, *pargs, **kwargs):
+        return self.compute().index(*pargs, **kwargs)
+    def clear(self):
+        self.original = list()
+    def append(self, other):
+        self.original.append(other)
+    def remove(self, other):
+        self.original.remove(other)
+    def extend(self, other):
+        self.original.extend(other)
+    def __contains__(self, item):
+        return self.compute().__contains__(item)
+    def __iter__(self):
+        return self.compute().__iter__()
+    def __len__(self):
+        return self.compute().__len__()
+    def __delitem__(self, index):
+        self.original.__delitem__(index)
+    def __reversed__(self):
+        return self.compute().__reversed__()
+    def __setitem__(self, index, value):
+        return self.original.__setitem__(index, value)
+    def __getitem__(self, index):
+        return self.compute()[index]
+    def __str__(self):
+        return str(self.compute())
+    def __repr__(self):
+        return repr(self.compute())
+    def __eq__(self, other):
+        return self.original == other
+
 def word(the_word, **kwargs):
     """Returns the word translated into the current language.  If a translation
     is not known, the input is returned."""
@@ -1565,6 +1628,8 @@ def word(the_word, **kwargs):
         the_word = 'no'
     elif the_word is None:
         the_word = "I don't know"
+    if isinstance(the_word, LazyWord):
+        the_word = the_word.original
     try:
         the_word = word_collection[kwargs.get('language', this_thread.language)][the_word]
     except:
@@ -1822,6 +1887,13 @@ def comma_and_list_en(*pargs, **kwargs):
         return the_list[0] + before_and + and_string + after_and + the_list[1]
     else:
         return comma_string.join(the_list[:-1]) + extracomma + before_and + and_string + after_and + the_list[-1]
+
+def manual_line_breaks(text):
+    """Replaces newlines with manual line breaks."""
+    if this_thread.evaluation_context == 'docx':
+        return re.sub(r' *\r?\n *', '</w:t><w:br/><w:t xml:space="preserve">', str(text))
+    else:
+        return re.sub(r' *\r?\n *', ' [BR] ', str(text))
 
 def add_separators_en(*pargs, **kwargs):
     """Accepts a list and returns a list, with semicolons after each item,
@@ -2712,7 +2784,21 @@ def variables_as_json(include_internal=False):
     """Sends an HTTP response with all variables in JSON format."""
     raise ResponseError(None, all_variables=True, include_internal=include_internal)
 
-def all_variables(simplify=True, include_internal=False, special=False):
+def store_variables_snapshot(data=None, include_internal=False, key=None, persistent=False):
+    """Stores a snapshot of the interview answers in non-encrypted JSON format."""
+    session = get_uid()
+    filename = this_thread.current_info.get('yaml_filename', None)
+    if session is None or filename is None:
+        raise DAError("store_variables_snapshot: could not identify the session")
+    if key is not None and not isinstance(key, str):
+        raise DAError("store_variables_snapshot: key must be a string")
+    if data is None:
+        the_data = serializable_dict(get_user_dict(), include_internal=include_internal)
+    else:
+        the_data = safe_json(data)
+    server.write_answer_json(session, filename, the_data, tags=key, persistent=True if persistent else False)
+
+def all_variables(simplify=True, include_internal=False, special=False, make_copy=False):
     """Returns the interview variables as a dictionary suitable for export to JSON or other formats."""
     if special == 'titles':
         return this_thread.interview.get_title(get_user_dict())
@@ -2723,6 +2809,8 @@ def all_variables(simplify=True, include_internal=False, special=False):
         return copy.deepcopy(this_thread.internal['tags'])
     if simplify:
         return serializable_dict(get_user_dict(), include_internal=include_internal)
+    if make_copy:
+        return copy.deepcopy(pickleable_objects(get_user_dict()))
     return pickleable_objects(get_user_dict())
 
 def command(*pargs, **kwargs):
@@ -2893,8 +2981,6 @@ def package_data_filename(the_file):
 
 def package_question_filename(the_file):
     parts = the_file.split(":")
-    #if len(parts) == 1:
-    #    parts = ['docassemble.base', the_file]
     if len(parts) == 2:
         if not re.match(r'data/.*', parts[1]):
             parts[1] = 'data/questions/' + parts[1]
@@ -2979,7 +3065,7 @@ def process_action():
                 else:
                     #logmessage("process_action: forcing a nameerror")
                     this_thread.misc['forgive_missing_question'] = [event_info['action']] #restore
-                    force_ask_nameerror(event_info['action'])
+                    force_ask(event_info['action'])
                     #logmessage("process_action: done with trying")
         #logmessage("process_action: returning")
         if 'forgive_missing_question' in this_thread.misc:
@@ -3259,6 +3345,9 @@ def url_action(action, **kwargs):
 
 def myb64quote(text):
     return re.sub(r'[\n=]', '', codecs.encode(text.encode('utf-8'), 'base64').decode())
+
+def myb64unquote(text):
+    return codecs.decode(repad_byte(bytearray(text, encoding='utf-8')), 'base64').decode('utf-8')
 
 # def set_debug_status(new_value):
 #     global debug
@@ -3601,40 +3690,6 @@ def single_paragraph(text):
 def quote_paragraphs(text):
     """Adds Markdown to quote all paragraphs in the text."""
     return '> ' + single_newline.sub('\n> ', str(text).strip())
-
-def task_performed(task):
-    """Returns True if the task has been performed at least once, otherwise False."""
-    ensure_definition(task)
-    if task in this_thread.internal['tasks'] and this_thread.internal['tasks'][task]:
-        return True
-    return False
-
-def task_not_yet_performed(task):
-    """Returns True if the task has never been performed, otherwise False."""
-    ensure_definition(task)
-    if task_performed(task):
-        return False
-    return True
-
-def mark_task_as_performed(task):
-    """Increases by 1 the number of times the task has been performed."""
-    ensure_definition(task)
-    if not task in this_thread.internal['tasks']:
-        this_thread.internal['tasks'][task] = 0
-    this_thread.internal['tasks'][task] += 1
-    return this_thread.internal['tasks'][task]
-
-def times_task_performed(task):
-    """Returns the number of times the task has been performed."""
-    ensure_definition(task)
-    if not task in this_thread.internal['tasks']:
-        return 0
-    return this_thread.internal['tasks'][task]
-
-def set_task_counter(task, times):
-    """Allows you to manually set the number of times the task has been performed."""
-    ensure_definition(task, times)
-    this_thread.internal['tasks'][task] = times
 
 def set_live_help_status(availability=None, mode=None, partner_roles=None):
     """Defines whether live help features are available, the mode of chat,
@@ -4016,7 +4071,7 @@ def decode_name(var):
     """Convert a base64-encoded variable name to plain text."""
     return codecs.decode(repad_byte(bytearray(var, encoding='utf-8')), 'base64').decode('utf-8')
 
-def interview_list(exclude_invalid=True, action=None, filename=None, session=None, user_id=None, include_dict=True, delete_shared=False):
+def interview_list(exclude_invalid=True, action=None, filename=None, session=None, user_id=None, include_dict=True, delete_shared=False, next_id=None):
     """Returns a list of interviews that users have started."""
     if this_thread.current_info['user']['is_authenticated']:
         if user_id == 'all' or session is not None:
@@ -4029,6 +4084,19 @@ def interview_list(exclude_invalid=True, action=None, filename=None, session=Non
             raise DAError("interview_list: invalid action")
         if action == 'delete' and (filename is None or session is None):
             raise DAError("interview_list: a filename and session must be provided when delete is the action.")
+        if action is None:
+            if next_id is not None:
+                try:
+                    start_id = int(myb64unquote(next_id))
+                    assert start_id >= 0
+                except:
+                    raise DAError("interview_list: invalid next_id.")
+            else:
+                start_id = None
+            (the_list, start_id) = server.user_interviews(user_id=user_id, secret=this_thread.current_info['secret'], exclude_invalid=exclude_invalid, action=action, filename=filename, session=session, include_dict=include_dict, delete_shared=delete_shared, start_id=start_id)
+            if start_id is None:
+                return (the_list, None)
+            return (the_list, myb64quote(str(start_id)))
         return server.user_interviews(user_id=user_id, secret=this_thread.current_info['secret'], exclude_invalid=exclude_invalid, action=action, filename=filename, session=session, include_dict=include_dict, delete_shared=delete_shared)
     return None
 
@@ -4036,10 +4104,21 @@ def interview_menu(*pargs, **kwargs):
     """Returns the list of interviews that is offered at /list."""
     return server.interview_menu(*pargs, **kwargs)
 
-def get_user_list(include_inactive=False):
+def get_user_list(include_inactive=False, next_id=None):
     """Returns a list of users on the system."""
     if this_thread.current_info['user']['is_authenticated']:
-        return server.get_user_list(include_inactive=include_inactive)
+        if next_id is not None:
+            try:
+                start_id = int(myb64unquote(next_id))
+                assert start_id >= 0
+            except:
+                raise DAError("get_user_list: invalid next_id.")
+        else:
+            start_id = None
+        (the_list, start_id) = server.get_user_list(include_inactive=include_inactive, start_id=start_id)
+        if start_id is None:
+            return (the_list, None)
+        return (the_list, myb64quote(str(start_id)))
     return None
 
 def manage_privileges(*pargs):
@@ -4097,15 +4176,24 @@ def get_user_secret(username, password):
     """
     return server.get_secret(username, password)
 
+def create_session(yaml_filename, secret=None, url_args=None):
+    """Creates a new session in the given interview."""
+    if secret is None:
+        secret = this_thread.current_info.get('secret', None)
+    (encrypted, session_id) = server.create_session(yaml_filename, secret, url_args=url_args)
+    if secret is None and encrypted:
+        raise Exception("create_session: the interview is encrypted but you did not provide a secret.")
+    return session_id
+
 def get_session_variables(yaml_filename, session_id, secret=None, simplify=True):
     """Returns the interview dictionary for the given interview session."""
     return server.get_session_variables(yaml_filename, session_id, secret=secret, simplify=simplify)
 
-def set_session_variables(yaml_filename, session_id, variables, secret=None, question_name=None):
+def set_session_variables(yaml_filename, session_id, variables, secret=None, question_name=None, overwrite=False):
     """Sets variables in the interview dictionary for the given interview session."""
     if session_id == get_uid() and yaml_filename == this_thread.current_info.get('yaml_filename', None):
         raise Exception("You cannot set variables in the current interview session")
-    server.set_session_variables(yaml_filename, session_id, dict(), secret=secret, literal_variables=variables, question_name=question_name)
+    server.set_session_variables(yaml_filename, session_id, variables, secret=secret, question_name=question_name, post_setting=False if overwrite else True)
 
 def get_question_data(yaml_filename, session_id, secret=None):
     """Returns data about the current question for the given interview session."""

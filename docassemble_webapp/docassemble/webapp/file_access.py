@@ -16,6 +16,7 @@ import docassemble.base.functions
 from docassemble.webapp.users.models import UserDictKeys, UserRoles
 from docassemble.webapp.core.models import Uploads, UploadsUserAuth, UploadsRoleAuth
 from docassemble.webapp.files import SavedFile, get_ext_and_mimetype
+from flask import session
 from flask_login import current_user
 from sqlalchemy import or_, and_
 import docassemble.base.config
@@ -169,6 +170,7 @@ def get_info_from_file_reference(file_reference, **kwargs):
         #logmessage(str(file_reference) + " is not a URL")
         result = dict()
         question = kwargs.get('question', None)
+        manual_package = kwargs.get('package', None)
         folder = kwargs.get('folder', None)
         the_package = None
         parts = file_reference.split(':')
@@ -176,6 +178,8 @@ def get_info_from_file_reference(file_reference, **kwargs):
             the_package = None
             if question is not None:
                 the_package = question.from_source.package
+            elif manual_package is not None:
+                the_package = manual_package
             if the_package is None:
                 the_package = docassemble.base.functions.get_current_package()
             if folder is None:
@@ -196,7 +200,7 @@ def get_info_from_file_reference(file_reference, **kwargs):
         elif len(parts) == 2:
             result['package'] = parts[0]
         result['fullpath'] = docassemble.base.functions.static_filename_path(file_reference)
-    #logmessage("path is " + str(result['fullpath']))
+    # sys.stderr.write("path is " + str(result['fullpath']) + "\n")
     if result['fullpath'] is not None: #os.path.isfile(result['fullpath'])
         if not has_info:
             result['filename'] = os.path.basename(result['fullpath'])
@@ -214,13 +218,13 @@ def get_info_from_file_reference(file_reference, **kwargs):
                 result['fullpath'] = result['path'] + '.' + result['extension']
                 ext_type, result['mimetype'] = get_ext_and_mimetype(result['fullpath'])
             else:
-                logmessage("Did not find file " + result['path'] + '.' + convert[result['extension']])
+                sys.stderr.write("Did not find file " + result['path'] + '.' + convert[result['extension']] + "\n")
                 return dict()
         #logmessage("Full path is " + result['fullpath'])
         if os.path.isfile(result['fullpath']) and not has_info:
             add_info_about_file(result['fullpath'], result['path'], result)
     else:
-        logmessage("File reference " + str(file_reference) + " DID NOT EXIST.")
+        sys.stderr.write("File reference " + str(file_reference) + " DID NOT EXIST.\n")
     return(result)
 
 def add_info_about_file(filename, basename, result):

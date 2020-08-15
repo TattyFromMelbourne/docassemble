@@ -22,6 +22,7 @@ the_method_type = types.FunctionType
 equals_byte = bytes('=', 'utf-8')
 
 TypeType = type(type(None))
+NoneType = type(None)
 
 from docassemble.base.config import daconfig, hostname, in_celery
 
@@ -36,7 +37,6 @@ else:
 
 REQUIRE_IDEMPOTENT = not daconfig.get('allow non-idempotent questions', True)
 STRICT_MODE = daconfig.get('restrict input variables', False)
-
 PACKAGE_PROTECTION = daconfig.get('package protection', True)
 
 HTTP_TO_HTTPS = daconfig.get('behind https load balancer', False)
@@ -182,6 +182,10 @@ UPLOAD_DIRECTORY = daconfig.get('uploads', '/usr/share/docassemble/files')
 PACKAGE_DIRECTORY = daconfig.get('packages', '/usr/share/docassemble/local' + str(sys.version_info.major) + '.' + str(sys.version_info.minor))
 FULL_PACKAGE_DIRECTORY = os.path.join(PACKAGE_DIRECTORY, 'lib', 'python' + str(sys.version_info.major) + '.' + str(sys.version_info.minor), 'site-packages')
 LOG_DIRECTORY = daconfig.get('log', '/usr/share/docassemble/log')
+
+PAGINATION_LIMIT = daconfig.get('pagination limit', 100)
+PAGINATION_LIMIT_PLUS_ONE = PAGINATION_LIMIT + 1
+
 #PLAYGROUND_MODULES_DIRECTORY = daconfig.get('playground_modules', )
 
 init_py_file = """try:
@@ -239,7 +243,7 @@ def _get_safe_next_param(param_name, default_endpoint):
 #             and not current_app.user_manager.enable_login_without_confirm_email \
 #             and not user.has_confirmed_email():
 #         url = url_for('user.resend_confirm_email')
-#         flash(flask_user.translations.gettext('Your email address has not yet been confirmed. Check your email Inbox and Spam folders for the confirmation email or <a href="%(url)s">Re-send confirmation email</a>.', url=url), 'error')
+#         flash(docassemble_flask_user.translations.gettext('Your email address has not yet been confirmed. Check your email Inbox and Spam folders for the confirmation email or <a href="%(url)s">Re-send confirmation email</a>.', url=url), 'error')
 #         return redirect(url_for('user.login'))
 
 #     login_user(user, remember=remember_me)
@@ -260,8 +264,8 @@ def custom_resend_confirm_email():
         email = form.email.data
         user, user_email = user_manager.find_user_by_email(email)
         if user:
-            flask_user.views._send_confirm_email(user, user_email)
-        return redirect(flask_user.views._endpoint_url(user_manager.after_resend_confirm_email_endpoint))
+            docassemble_flask_user.views._send_confirm_email(user, user_email)
+        return redirect(docassemble_flask_user.views._endpoint_url(user_manager.after_resend_confirm_email_endpoint))
     response = make_response(user_manager.render_function(user_manager.resend_confirm_email_template, form=form), 200)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     return response
@@ -325,12 +329,12 @@ def custom_register():
         email_taken = False
         if daconfig.get('confirm registration', False):
             try:
-                flask_user.forms.unique_email_validator(register_form, register_form.email)
+                docassemble_flask_user.forms.unique_email_validator(register_form, register_form.email)
             except wtforms.ValidationError:
                 email_taken = True
         if email_taken:
             flash(word('A confirmation email has been sent to %(email)s with instructions to complete your registration.' % {'email': register_form.email.data}), 'success')
-            subject, html_message, text_message = flask_user.emails._render_email(
+            subject, html_message, text_message = docassemble_flask_user.emails._render_email(
                 'flask_user/emails/reregistered',
                 app_name=app.config['APP_NAME'],
                 sign_in_link=url_for('user.login', _external=True))
@@ -426,7 +430,7 @@ def custom_register():
         if user_manager.send_registered_email:
             try:
                 # Send 'registered' email
-                flask_user.views._send_registered_email(user, user_email, require_email_confirmation)
+                docassemble_flask_user.views._send_registered_email(user, user_email, require_email_confirmation)
             except Exception as e:
                 # delete new User object if send fails
                 db_adapter.delete_object(user)
@@ -434,7 +438,7 @@ def custom_register():
                 raise
 
         # Send user_registered signal
-        flask_user.signals.user_registered.send(current_app._get_current_object(),
+        docassemble_flask_user.signals.user_registered.send(current_app._get_current_object(),
                                                 user=user,
                                                 user_invite=user_invite)
 
@@ -460,7 +464,7 @@ def custom_register():
                         return redirect(url_for('mfa_sms_setup'))
                     else:
                         return redirect(url_for('mfa_choose'))
-            return flask_user.views._do_login_user(user, safe_reg_next)
+            return docassemble_flask_user.views._do_login_user(user, safe_reg_next)
         else:
             return redirect(url_for('user.login') + '?next=' + urllibquote(safe_reg_next))
 
@@ -558,7 +562,7 @@ def custom_login():
                 url = url_for('user.resend_confirm_email', email=user.email)
                 flash(word('You cannot log in until your e-mail address has been confirmed.') + '<br><a href="' + url + '">' + word('Click here to confirm your e-mail') + '</a>.', 'error')
                 return redirect(url_for('user.login'))
-            return add_secret_to(flask_user.views._do_login_user(user, safe_next, login_form.remember_me.data))
+            return add_secret_to(docassemble_flask_user.views._do_login_user(user, safe_next, login_form.remember_me.data))
     if is_json:
         return jsonify(action='login', csrf_token=generate_csrf())
     # if 'officeaddin' in safe_next:
@@ -603,7 +607,7 @@ def logout():
             next = get_base_url() + next
         next = 'https://' + daconfig['oauth']['auth0']['domain'] + '/v2/logout?' + urlencode(dict(returnTo=next, client_id=daconfig['oauth']['auth0']['id']))
     set_cookie = False
-    flask_user.signals.user_logged_out.send(current_app._get_current_object(), user=current_user)
+    docassemble_flask_user.signals.user_logged_out.send(current_app._get_current_object(), user=current_user)
     logout_user()
     delete_session()
     session.clear()
@@ -729,19 +733,12 @@ from docassemble.webapp.app_object import app, csrf, flaskbabel
 from docassemble.webapp.db_object import db
 from docassemble.webapp.users.forms import MyRegisterForm, MyInviteForm, MySignInForm, PhoneLoginForm, PhoneLoginVerifyForm, MFASetupForm, MFAReconfigureForm, MFALoginForm, MFAChooseForm, MFASMSSetupForm, MFAVerifySMSSetupForm, MyResendConfirmEmailForm, ManageAccountForm
 from docassemble.webapp.users.models import UserModel, UserAuthModel, MyUserInvitation, Role
-import flask_user.translations
-def word_with_format(string, **variables):
-    new_string = word(string)
-    if new_string == string:
-        return flask_user.translations.gettext(string, **variables)
-    return word(string) % variables
-flask_user.translations._ = word_with_format
-flask_user.translations.lazy_gettext = word_with_format
-from flask_user import UserManager, SQLAlchemyAdapter
+from docassemble_flask_user import UserManager, SQLAlchemyAdapter
 from flask_cors import cross_origin
 from flask_wtf.csrf import CSRFError
 db_adapter = SQLAlchemyAdapter(db, UserModel, UserAuthClass=UserAuthModel, UserInvitationClass=MyUserInvitation)
 from docassemble.webapp.users.views import user_profile_page
+from docassemble.webapp.translations import setup_translation
 user_manager = UserManager()
 user_manager.init_app(app, db_adapter=db_adapter, login_form=MySignInForm, register_form=MyRegisterForm, user_profile_view_function=user_profile_page, logout_view_function=logout, unauthorized_view_function=unauthorized, unauthenticated_view_function=unauthenticated, login_view_function=custom_login, register_view_function=custom_register, resend_confirm_email_view_function=custom_resend_confirm_email, resend_confirm_email_form=MyResendConfirmEmailForm, password_validator=password_validator)
 from flask_login import LoginManager
@@ -806,17 +803,15 @@ from pygments.lexers import YamlLexer, PythonLexer
 from pygments.formatters import HtmlFormatter
 from flask import make_response, abort, render_template, render_template_string, request, session, send_file, redirect, current_app, get_flashed_messages, flash, Markup, jsonify, Response, g, make_response
 from flask_login import login_user, logout_user, current_user
-from flask_user import login_required, roles_required
-from flask_user import signals, user_logged_in, user_changed_password, user_registered, user_reset_password
+from docassemble_flask_user import login_required, roles_required
+from docassemble_flask_user import signals, user_logged_in, user_changed_password, user_registered, user_reset_password
 #from flask_wtf.csrf import generate_csrf
 from docassemble.webapp.develop import CreatePackageForm, CreatePlaygroundPackageForm, UpdatePackageForm, ConfigForm, PlaygroundForm, PlaygroundUploadForm, LogForm, Utilities, PlaygroundFilesForm, PlaygroundFilesEditForm, PlaygroundPackagesForm, GoogleDriveForm, OneDriveForm, GitHubForm, PullPlaygroundPackage, TrainingForm, TrainingUploadForm, APIKey, AddinUploadForm, RenameProject, DeleteProject, NewProject
-
-import flask_user.signals
-import flask_user.views
-import flask_user.emails
-import flask_user.forms
-flask_user.views._ = word_with_format
-flask_user.forms._ = word_with_format
+import docassemble_flask_user.signals
+import docassemble_flask_user.emails
+import docassemble_flask_user.views
+import docassemble_flask_user.forms
+from docassemble.webapp.translations import setup_translation
 
 import wtforms
 import werkzeug.utils
@@ -1008,8 +1003,16 @@ else:
     app.config['BUTTON_STYLE'] = 'btn-'
 
 page_parts = dict()
+if 'global footer' in daconfig:
+    if type(daconfig['global footer']) is dict:
+        page_parts['global footer'] = dict()
+        for lang, val in daconfig['global footer'].items():
+            page_parts['global footer'][lang] = Markup(val)
+    else:
+        page_parts['global footer'] = {'*': Markup(str(daconfig['global footer']))}
+
 for page_key in ('login page', 'register page', 'interview page', 'start page', 'profile page', 'reset password page', 'forgot password page', 'change password page', '404 page'):
-    for part_key in ('title', 'tab title', 'extra css', 'extra javascript', 'heading', 'pre', 'submit', 'post'):
+    for part_key in ('title', 'tab title', 'extra css', 'extra javascript', 'heading', 'pre', 'submit', 'post', 'footer'):
         key = page_key + ' ' + part_key
         if key in daconfig:
             if type(daconfig[key]) is dict:
@@ -1021,7 +1024,7 @@ for page_key in ('login page', 'register page', 'interview page', 'start page', 
 
 main_page_parts = dict()
 lang_list = set()
-for key in ('main page title', 'main page short title', 'main page logo', 'main page subtitle', 'main page pre', 'main page submit', 'main page post', 'main page under', 'main page right', 'main page exit label', 'main page help label', 'main page continue button label', 'main page back button label', 'main page resume button label'):
+for key in ('main page title', 'main page short title', 'main page logo', 'main page subtitle', 'main page pre', 'main page submit', 'main page post', 'main page footer', 'main page under', 'main page right', 'main page exit label', 'main page help label', 'main page continue button label', 'main page back button label', 'main page resume button label'):
     if key in daconfig and type(daconfig[key]) is dict:
         for lang in daconfig[key]:
             lang_list.add(lang)
@@ -1029,7 +1032,7 @@ lang_list.add(DEFAULT_LANGUAGE)
 lang_list.add('*')
 for lang in lang_list:
     main_page_parts[lang] = dict()
-for key in ('main page pre', 'main page submit', 'main page post', 'main page under', 'main page subtitle', 'main page logo', 'main page title', 'main page short title', 'main page continue button label', 'main page help label', 'main page back button label', 'main page right', 'main page exit url', 'main page exit label', 'main page exit link', 'main page resume button label', 'main page title url', 'main page title url opens in other window'):
+for key in ('main page pre', 'main page submit', 'main page post', 'main page footer', 'main page under', 'main page subtitle', 'main page logo', 'main page title', 'main page short title', 'main page continue button label', 'main page help label', 'main page back button label', 'main page right', 'main page exit url', 'main page exit label', 'main page exit link', 'main page resume button label', 'main page title url', 'main page title url opens in other window'):
     for lang in lang_list:
         if key in daconfig:
             if type(daconfig[key]) is dict:
@@ -1085,7 +1088,7 @@ def initiate_sms_session(phone_number, yaml_filename=None, uid=None, secret=None
     if config not in twilio_config['name']:
         raise DAError("get_sms_session: Invalid twilio configuration")
     tconfig = twilio_config['name'][config]
-    current_info = docassemble.base.functions.get_current_info()
+    current_info = docassemble.base.functions.get_current_info(secret=secret)
     if yaml_filename is None:
         yaml_filename = current_info.get('yaml_filename', None)
         if yaml_filename is None:
@@ -1432,16 +1435,12 @@ def substitute_secret(oldsecret, newsecret, user=None, to_convert=None):
         #logmessage("substitute_secret: returning new secret without doing anything")
         return newsecret
     #logmessage("substitute_secret: continuing")
-    updated = False
-    for object_entry in GlobalObjectStorage.query.filter_by(user_id=user.id).with_for_update().all():
-        if object_entry.encrypted:
-            try:
-                object_entry.value = encrypt_object(decrypt_object(object_entry.value, oldsecret), newsecret)
-            except Exception as err:
-                logmessage("Failure to change encryption of object " + object_entry.key + str(err))
-            updated = True
-    if updated:
-        db.session.commit()
+    for object_entry in GlobalObjectStorage.query.filter_by(user_id=user.id, encrypted=True).with_for_update().all():
+        try:
+            object_entry.value = encrypt_object(decrypt_object(object_entry.value, oldsecret), newsecret)
+        except Exception as err:
+            logmessage("Failure to change encryption of object " + object_entry.key + str(err))
+    db.session.commit()
     if to_convert is None:
         to_do = set()
         if 'i' in session and 'uid' in session: #TEMPORARY
@@ -1463,6 +1462,12 @@ def substitute_secret(oldsecret, newsecret, user=None, to_convert=None):
                 phrase = decrypt_phrase(record.phrase, oldsecret)
                 record.phrase = encrypt_phrase(phrase, newsecret)
                 changed = True
+            except:
+                pass
+        db.session.commit()
+        for object_entry in GlobalObjectStorage.query.filter(and_(GlobalObjectStorage.key.like('da:uid:' + user_code + ':i:' + filename + ':%'), GlobalObjectStorage.encrypted == True)).with_for_update().all():
+            try:
+                object_entry.value = encrypt_object(decrypt_object(object_entry.value, oldsecret), newsecret)
             except:
                 pass
         db.session.commit()
@@ -2045,20 +2050,14 @@ def sub_temp_user_dict_key(temp_user_id, user_id):
 
 def sub_temp_other(user):
     if 'tempuser' in session:
-        something_changed = False
         for chat_entry in ChatLog.query.filter_by(temp_user_id=int(session['tempuser'])).with_for_update().all():
             chat_entry.user_id = user.id
             chat_entry.temp_user_id = None
-            something_changed = True
-        if something_changed:
-            db.session.commit()
-        something_changed = False
+        db.session.commit()
         for chat_entry in ChatLog.query.filter_by(temp_owner_id=int(session['tempuser'])).with_for_update().all():
             chat_entry.owner_id = user.id
             chat_entry.temp_owner_id = None
-            something_changed = True
-        if something_changed:
-            db.session.commit()
+        db.session.commit()
         keys_in_use = dict()
         for object_entry in GlobalObjectStorage.query.filter_by(user_id=user.id).all():
             if object_entry.key.startswith('da:userid:{:d}:'.format(user.id)):
@@ -2066,9 +2065,7 @@ def sub_temp_other(user):
                     keys_in_use[object_entry.key] = list()
                 keys_in_use[object_entry.key].append(object_entry.id)
         ids_to_delete = list()
-        something_changed = False
         for object_entry in GlobalObjectStorage.query.filter_by(temp_user_id=int(session['tempuser'])).with_for_update().all():
-            something_changed = True
             object_entry.user_id = user.id
             object_entry.temp_user_id = None
             if object_entry.key.startswith('da:userid:t{:d}:'.format(session['tempuser'])):
@@ -2083,15 +2080,11 @@ def sub_temp_other(user):
                     logmessage("Failure to change encryption of object " + object_entry.key + ": " + str(err))
         for the_id in ids_to_delete:
             GlobalObjectStorage.query.filter_by(id=the_id).delete()
-        if something_changed:
-            db.session.commit()
-        something_changed = False
+        db.session.commit()
         for auth_entry in UploadsUserAuth.query.filter_by(temp_user_id=int(session['tempuser'])).with_for_update().all():
             auth_entry.user_id = user.id
             auth_entry.temp_user_id = None
-            something_changed = True
-        if something_changed:
-            db.session.commit()
+        db.session.commit()
         del session['tempuser']
 
 def save_user_dict_key(session_id, filename, priors=False, user=None):
@@ -3690,15 +3683,24 @@ def restart_this():
 def restart_others():
     logmessage("restart_others: starting")
     if USING_SUPERVISOR:
+        cron_key = 'da:cron_restart'
+        cron_url = None
         for host in Supervisors.query.all():
-            if host.url:
-                if host.hostname != hostname:
-                    restart_on(host)
-            #else:
-            #    logmessage("restart_others: unable to get host url")
+            if host.url and host.hostname != hostname and ':cron:' in str(host.role):
+                pipe = r.pipeline()
+                pipe.set(cron_key, 1)
+                pipe.expire(cron_key, 5)
+                pipe.execute()
+                restart_on(host)
+                while r.get(cron_key) is not None:
+                    time.sleep(1)
+                cron_url = host.url
+        for host in Supervisors.query.all():
+            if host.url and host.url != cron_url and host.hostname != hostname:
+                restart_on(host)
     return
 
-def current_info(yaml=None, req=None, action=None, location=None, interface='web', session_info=None):
+def current_info(yaml=None, req=None, action=None, location=None, interface='web', session_info=None, secret=None):
     #logmessage("interface is " + str(interface))
     if current_user.is_authenticated and not current_user.is_anonymous:
         ext = dict(email=current_user.email, roles=[role.name for role in current_user.roles], the_user_id=current_user.id, theid=current_user.id, firstname=current_user.first_name, lastname=current_user.last_name, nickname=current_user.nickname, country=current_user.country, subdivisionfirst=current_user.subdivisionfirst, subdivisionsecond=current_user.subdivisionsecond, subdivisionthird=current_user.subdivisionthird, organization=current_user.organization, timezone=current_user.timezone, language=current_user.language)
@@ -3708,14 +3710,14 @@ def current_info(yaml=None, req=None, action=None, location=None, interface='web
     if req is None:
         url_root = daconfig.get('url root', 'http://localhost') + ROOT
         url = url_root + 'interview'
-        secret = None
         clientip = None
         method = None
         unique_id = '0'
     else:
         url_root = url_for('rootindex', _external=True)
         url = url_root + 'interview'
-        secret = req.cookies.get('secret', None)
+        if secret is None:
+            secret = req.cookies.get('secret', None)
         for key, value in req.headers.items():
             headers[key] = value
         clientip = req.remote_addr
@@ -3728,7 +3730,7 @@ def current_info(yaml=None, req=None, action=None, location=None, interface='web
             if current_user.is_authenticated and not current_user.is_anonymous and current_user.email:
                 unique_id = str(current_user.email)
             else:
-                unique_id = random_string(10)
+                unique_id = app.session_interface.manual_save_session(app, session).decode()[5:15]
         #logmessage("unique id is " + unique_id)
     if secret is not None:
         secret = str(secret)
@@ -4345,7 +4347,7 @@ def mfa_setup():
                 del session['next']
             else:
                 next_url = url_for('interview_list', from_login='1')
-            return flask_user.views._do_login_user(user, next_url, False)
+            return docassemble_flask_user.views._do_login_user(user, next_url, False)
         flash(word("You are now set up with two factor authentication."), 'success')
         return redirect(url_for('user_profile_page'))
     otp_secret = pyotp.random_base32()
@@ -4373,6 +4375,7 @@ def mfa_setup():
 @login_required
 @app.route('/mfa_reconfigure', methods=['POST', 'GET'])
 def mfa_reconfigure():
+    setup_translation()
     if not app.config['USE_MFA'] or not current_user.has_role(*app.config['MFA_ROLES']) or not current_user.social_id.startswith('local'):
         return ('File not found', 404)
     user = load_user(current_user.id)
@@ -4512,7 +4515,7 @@ def mfa_verify_sms_setup():
                     del session['next']
                 else:
                     next_url = url_for('interview_list', from_login='1')
-                return flask_user.views._do_login_user(user, next_url, False)
+                return docassemble_flask_user.views._do_login_user(user, next_url, False)
             flash(word("You are now set up with two factor authentication."), 'success')
             return redirect(url_for('user_profile_page'))
     return render_template('flask_user/mfa_verify_sms_setup.html', form=form, version_warning=None, title=word("Two-factor authentication"), tab_title=word("Authentication"), page_title=word("Authentication"), description=word('We just sent you a text message with a verification code.  Enter the verification code to proceed.'))
@@ -4573,7 +4576,7 @@ def mfa_login():
                     return redirect(url_for('user.login'))
             elif failed_attempts is not None:
                 r.delete(fail_key)
-        return flask_user.views._do_login_user(user, safe_next, False)
+        return docassemble_flask_user.views._do_login_user(user, safe_next, False)
     description = word("This account uses two-factor authentication.")
     if user.otp_secret.startswith(':phone:'):
         description += "  " + word("Please enter the verification code from the text message we just sent you.")
@@ -4679,6 +4682,7 @@ def github_menu():
         return ('File not found', 404)
     if not app.config['USE_GITHUB']:
         return ('File not found', 404)
+    setup_translation()
     form = GitHubForm(request.form)
     if request.method == 'POST':
         if form.configure.data:
@@ -4703,9 +4707,9 @@ def github_menu():
             info = json.loads(uses_github)
             form.shared.data = info['shared']
             form.orgs.data = info['orgs']
-        description = "Your GitHub integration is currently turned on.  Below, you can change which repositories docassemble can access.  You can disable GitHub integration if you no longer wish to use it."
+        description = word("Your GitHub integration is currently turned on.  Below, you can change which repositories docassemble can access.  You can disable GitHub integration if you no longer wish to use it.")
     else:
-        description = "If you have a GitHub account, you can turn on GitHub integration.  This will allow you to use GitHub as a version control system for packages from inside the Playground."
+        description = word("If you have a GitHub account, you can turn on GitHub integration.  This will allow you to use GitHub as a version control system for packages from inside the Playground.")
     return render_template('pages/github.html', form=form, version_warning=None, title=word("GitHub Integration"), tab_title=word("GitHub"), page_title=word("GitHub"), description=description, uses_github=uses_github, bodyclass='daadminbody')
 
 @app.route('/github_configure', methods=['POST', 'GET'])
@@ -4716,6 +4720,7 @@ def github_configure():
         return ('File not found', 404)
     if not app.config['USE_GITHUB']:
         return ('File not found', 404)
+    setup_translation()
     storage = RedisCredStorage(app='github')
     credentials = storage.get()
     if not credentials or credentials.invalid:
@@ -4780,6 +4785,7 @@ def github_unconfigure():
         return ('File not found', 404)
     if not app.config['USE_GITHUB']:
         return ('File not found', 404)
+    setup_translation()
     storage = RedisCredStorage(app='github')
     credentials = storage.get()
     if not credentials or credentials.invalid:
@@ -4830,6 +4836,7 @@ def github_unconfigure():
 def github_oauth_callback():
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     failed = False
     if not app.config['USE_GITHUB']:
         logmessage('github_oauth_callback: server does not use github')
@@ -4936,7 +4943,7 @@ def exit_logout():
             manual_checkout(manual_filename=yaml_filename)
             reset_user_dict(session_info['uid'], yaml_filename)
     if current_user.is_authenticated:
-        flask_user.signals.user_logged_out.send(current_app._get_current_object(), user=current_user)
+        docassemble_flask_user.signals.user_logged_out.send(current_app._get_current_object(), user=current_user)
         logout_user()
     session.clear()
     response = redirect(the_exit_page)
@@ -4962,7 +4969,7 @@ def health_check():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     return response
 
-@app.route("/checkout", methods=['POST', 'GET'])
+@app.route("/checkout", methods=['POST'])
 def checkout():
     try:
         manual_checkout(manual_filename=request.args['i'])
@@ -5055,6 +5062,8 @@ def checkin():
     if secret is not None:
         secret = str(secret)
     if current_user.is_anonymous:
+        if 'tempuser' not in session:
+            return jsonify(success=False)
         the_user_id = 't' + str(session['tempuser'])
         auth_user_id = None
         temp_user_id = int(session['tempuser'])
@@ -5084,7 +5093,7 @@ def checkin():
             #sys.stderr.write("checkin: fetch_user_dict2\n")
             steps, user_dict, is_encrypted = fetch_user_dict(session_id, yaml_filename, secret=secret)
             interview = docassemble.base.interview_cache.get_interview(yaml_filename)
-            interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, action=dict(action=do_action, arguments=parameters), session_info=session_info))
+            interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, action=dict(action=do_action, arguments=parameters), session_info=session_info, secret=secret))
             interview_status.checkin = True
             interview.assemble(user_dict, interview_status=interview_status)
             if interview_status.question.question_type == "backgroundresponse":
@@ -5430,6 +5439,7 @@ def title_converter(content, part, status):
 @login_required
 @roles_required(['admin', 'developer'])
 def test_embed():
+    setup_translation()
     yaml_filename = request.args.get('i', final_default_yaml_filename)
     user_dict = fresh_dictionary()
     interview = docassemble.base.interview_cache.get_interview(yaml_filename)
@@ -5774,7 +5784,7 @@ def index(action_argument=None):
     else:
         the_location = None
     interview = docassemble.base.interview_cache.get_interview(yaml_filename)
-    interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, action=None, location=the_location, interface=the_interface, session_info=session_info), tracker=user_dict['_internal']['tracker'])
+    interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, action=None, location=the_location, interface=the_interface, session_info=session_info, secret=secret), tracker=user_dict['_internal']['tracker'])
     old_user_dict = None
     if '_back_one' in post_data and steps > 1:
         ok_to_go_back = True
@@ -5789,7 +5799,7 @@ def index(action_argument=None):
                 encrypted = is_encrypted
                 update_session(yaml_filename, encrypted=encrypted)
             action = None
-            interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, action=action, location=the_location, interface=the_interface, session_info=session_info), tracker=user_dict['_internal']['tracker'])
+            interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, action=action, location=the_location, interface=the_interface, session_info=session_info, secret=secret), tracker=user_dict['_internal']['tracker'])
             post_data = dict()
             disregard_input = True
     known_varnames = dict()
@@ -6064,12 +6074,13 @@ def index(action_argument=None):
             process_set_variable(file_field, user_dict, vars_set, old_values)
             try:
                 exec(the_string, user_dict)
-                if not changed:
-                    steps += 1
-                    user_dict['_internal']['steps'] = steps
-                    changed = True
+                changed = True
             except Exception as errMess:
-                error_messages.append(("error", "Error: " + str(errMess)))
+                try:
+                    sys.stderr.write(errMess.__class__.__name__ + ": " + str(errMess) + " after running " + the_string)
+                except:
+                    pass
+                error_messages.append(("error", "Error: " + errMess.__class__.__name__ + ": " + str(errMess)))
     if '_next_action_to_set' in post_data:
         next_action_to_set = json.loads(myb64unquote(post_data['_next_action_to_set']))
     else:
@@ -6095,6 +6106,7 @@ def index(action_argument=None):
                         break
     else:
         the_question = None
+    key_to_orig_key = dict()
     for orig_key in copy.deepcopy(post_data):
         if orig_key in ('_checkboxes', '_empties', '_ml_info', '_back_one', '_files', '_files_inline', '_question_name', '_the_image', '_save_as', '_success', '_datatypes', '_event', '_visible', '_tracker', '_track_location', '_varnames', '_next_action', '_next_action_to_set', 'ajax', 'json', 'informed', 'csrf_token', '_action', '_order_changes', '_collect', '_collect_delete', '_list_collect_list') or orig_key.startswith('_ignore'):
             continue
@@ -6106,12 +6118,15 @@ def index(action_argument=None):
             if orig_key in known_varnames:
                 if not (known_varnames[orig_key] in post_data and post_data[known_varnames[orig_key]] != '' and post_data[orig_key] == ''):
                     post_data[known_varnames[orig_key]] = post_data[orig_key]
+                    key_to_orig_key[from_safeid(known_varnames[orig_key])] = orig_key
             else:
                 m = re.search(r'^(_field_[0-9]+)(\[.*\])', key)
                 if m:
                     base_orig_key = safeid(m.group(1))
                     if base_orig_key in known_varnames:
-                        full_key = safeid(myb64unquote(known_varnames[base_orig_key]) + m.group(2))
+                        the_key = myb64unquote(known_varnames[base_orig_key]) + m.group(2)
+                        key_to_orig_key[the_key] = orig_key
+                        full_key = safeid(the_key)
                         post_data[full_key] = post_data[orig_key]
         if key.endswith('.gathered'):
             objname = re.sub(r'\.gathered$', '', key)
@@ -6269,7 +6284,7 @@ def index(action_argument=None):
                 else:
                     data = "False"
                     test_data = False
-            elif known_datatypes[real_key] in ('date', 'datetime'):
+            elif known_datatypes[real_key] in ('date', 'datetime', 'datetime-local'):
                 if isinstance(data, str):
                     data = data.strip()
                     if data != '':
@@ -6550,14 +6565,16 @@ def index(action_argument=None):
             exec(the_string, user_dict)
             changed = True
         except Exception as errMess:
-            error_messages.append(("error", "Error: " + str(errMess)))
+            error_messages.append(("error", "Error: " + errMess.__class__.__name__ + ": " + str(errMess)))
             try:
-                logmessage("Error: " + str(errMess))
+                logmessage("Tried to run " + the_string + " and got error " + errMess.__class__.__name__ + ": " + str(errMess))
             except:
                 pass
         if is_object:
             if '__DANEWOBJECT' in user_dict:
                 del user_dict['__DANEWOBJECT']
+        if key not in key_to_orig_key:
+            key_to_orig_key[key] = orig_key
     if validated and special_question is None and not disregard_input:
         for orig_key in empty_fields:
             key = myb64unquote(orig_key)
@@ -6713,13 +6730,17 @@ def index(action_argument=None):
                                 inline_files_processed.append(file_field)
                             else:
                                 the_string = file_field + " = None"
+                            key_to_orig_key[file_field] = orig_file_field
                             process_set_variable(file_field, user_dict, vars_set, old_values)
                             try:
                                 exec(the_string, user_dict)
                                 changed = True
                             except Exception as errMess:
-                                sys.stderr.write("Error: " + str(errMess) + "\n")
-                                error_messages.append(("error", "Error: " + str(errMess)))
+                                try:
+                                    sys.stderr.write("Error: " + errMess.__class__.__name__ + ": " + str(errMess) + " after trying to run " + the_string + "\n")
+                                except:
+                                    pass
+                                error_messages.append(("error", "Error: " + errMess.__class__.__name__ + ": " + str(errMess)))
                     else:
                         try:
                             file_field = from_safeid(var_to_store)
@@ -6732,13 +6753,14 @@ def index(action_argument=None):
                             error_messages.append(("error", "Error: Invalid character in file_field: " + str(file_field)))
                             break
                         the_string = file_field + " = None"
+                        key_to_orig_key[file_field] = orig_file_field
                         process_set_variable(file_field, user_dict, vars_set, old_values)
                         try:
                             exec(the_string, user_dict)
                             changed = True
                         except Exception as errMess:
-                            sys.stderr.write("Error: " + str(errMess) + "\n")
-                            error_messages.append(("error", "Error: " + str(errMess)))
+                            sys.stderr.write("Error: " + errMess.__class__.__name__ + ": " + str(errMess) + " after running " + the_string + "\n")
+                            error_messages.append(("error", "Error: " + errMess.__class__.__name__ + ": " + str(errMess)))
         if '_files' in post_data or (STRICT_MODE and (not disregard_input) and len(field_info['files']) > 0):
             if STRICT_MODE:
                 file_fields = field_info['files']
@@ -6765,6 +6787,7 @@ def index(action_argument=None):
                     break
                 if key_requires_preassembly.search(file_field):
                     should_assemble_now = True
+                key_to_orig_key[file_field] = orig_file_field
             if not has_invalid_fields:
                 initial_string = 'import docassemble.base.core'
                 try:
@@ -6846,8 +6869,8 @@ def index(action_argument=None):
                                     exec(the_string, user_dict)
                                     changed = True
                                 except Exception as errMess:
-                                    sys.stderr.write("Error: " + str(errMess) + "\n")
-                                    error_messages.append(("error", "Error: " + str(errMess)))
+                                    sys.stderr.write("Error: " + errMess.__class__.__name__ + ": " + str(errMess) + "after running " + the_string + "\n")
+                                    error_messages.append(("error", "Error: " + errMess.__class__.__name__ + ": " + str(errMess)))
                     else:
                         try:
                             file_field = from_safeid(var_to_store)
@@ -6867,8 +6890,8 @@ def index(action_argument=None):
                             exec(the_string, user_dict)
                             changed = True
                         except Exception as errMess:
-                            sys.stderr.write("Error: " + str(errMess) + "\n")
-                            error_messages.append(("error", "Error: " + str(errMess)))
+                            sys.stderr.write("Error: " + errMess.__class__.__name__ + ": " + str(errMess) + "after running " + the_string + "\n")
+                            error_messages.append(("error", "Error: " + errMess.__class__.__name__ + ": " + str(errMess)))
         if validated:
             if 'informed' in request.form:
                 user_dict['_internal']['informed'][the_user_id] = dict()
@@ -6943,7 +6966,10 @@ def index(action_argument=None):
                 logmessage(the_error_message)
                 if the_error_message == '':
                     the_error_message = word("Please enter a valid value.")
-                error_messages.append(("error", the_error_message))
+                if isinstance(validation_error, DAValidationError) and isinstance(validation_error.field, str) and validation_error.field in key_to_orig_key:
+                    field_error[key_to_orig_key[validation_error.field]] = the_error_message
+                else:
+                    error_messages.append(("error", the_error_message))
                 validated = False
                 steps, user_dict, is_encrypted = fetch_user_dict(user_code, yaml_filename, secret=secret)
     if validated:
@@ -6971,7 +6997,7 @@ def index(action_argument=None):
         user_dict = fresh_dictionary()
         user_dict['url_args'] = url_args
         user_dict['_internal']['referer'] = referer
-        interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, interface=the_interface, session_info=session_info))
+        interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, interface=the_interface, session_info=session_info, secret=secret))
         reset_user_dict(user_code, yaml_filename)
         if 'visitor_secret' not in request.cookies:
             save_user_dict_key(user_code, yaml_filename)
@@ -6983,7 +7009,7 @@ def index(action_argument=None):
         manual_checkout(manual_filename=yaml_filename)
         url_args = user_dict['url_args']
         referer = user_dict['_internal'].get('referer', None)
-        interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, interface=the_interface, session_info=session_info))
+        interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_filename, req=request, interface=the_interface, session_info=session_info, secret=secret))
         release_lock(user_code, yaml_filename)
         user_code, user_dict = reset_session(yaml_filename, secret)
         user_dict['url_args'] = url_args
@@ -7007,7 +7033,7 @@ def index(action_argument=None):
         else:
             response = do_redirect(title_info.get('exit url', None) or exit_page, is_ajax, is_json, js_target)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
         if response_wrapper:
             response_wrapper(response)
         return response
@@ -7023,7 +7049,7 @@ def index(action_argument=None):
         else:
             response = do_redirect(title_info.get('exit url', None) or exit_page, is_ajax, is_json, js_target)
         if current_user.is_authenticated:
-            flask_user.signals.user_logged_out.send(current_app._get_current_object(), user=current_user)
+            docassemble_flask_user.signals.user_logged_out.send(current_app._get_current_object(), user=current_user)
             logout_user()
         delete_session()
         session.clear()
@@ -7032,14 +7058,14 @@ def index(action_argument=None):
         response.set_cookie('secret', '', expires=0)
         response.set_cookie('session', '', expires=0)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
         return response
     will_save = True
     if interview_status.question.question_type == "refresh":
         release_lock(user_code, yaml_filename)
         response = do_refresh(is_ajax, yaml_filename)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
         if response_wrapper:
             response_wrapper(response)
         return response
@@ -7048,7 +7074,7 @@ def index(action_argument=None):
         sys.stderr.write("Redirecting because of a signin.\n")
         response = do_redirect(url_for('user.login', next=url_for('index', i=yaml_filename, session=user_code)), is_ajax, is_json, js_target)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
         if response_wrapper:
             response_wrapper(response)
         return response
@@ -7057,7 +7083,7 @@ def index(action_argument=None):
         sys.stderr.write("Redirecting because of a register.\n")
         response = do_redirect(url_for('user.register', next=url_for('index', i=yaml_filename, session=user_code)), is_ajax, is_json, js_target)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
         if response_wrapper:
             response_wrapper(response)
         return response
@@ -7069,7 +7095,7 @@ def index(action_argument=None):
         else:
             response = do_redirect(title_info.get('exit url', None) or exit_page, is_ajax, is_json, js_target)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
         if response_wrapper:
             response_wrapper(response)
         return response
@@ -7082,7 +7108,7 @@ def index(action_argument=None):
             release_lock(user_code, yaml_filename)
             response = jsonify(action='resubmit', csrf_token=generate_csrf())
             if return_fake_html:
-                fake_up(response)
+                fake_up(response, interview_language)
             if response_wrapper:
                 response_wrapper(response)
             return response
@@ -7107,7 +7133,7 @@ def index(action_argument=None):
             release_lock(user_code, yaml_filename)
             response = jsonify(action='resubmit', csrf_token=generate_csrf())
             if return_fake_html:
-                fake_up(response)
+                fake_up(response, interview_language)
             if response_wrapper:
                 response_wrapper(response)
             return response
@@ -7144,6 +7170,8 @@ def index(action_argument=None):
         advance_progress(user_dict, interview)
     title_info = interview_status.question.interview.get_title(user_dict, status=interview_status, converter=lambda content, part: title_converter(content, part, interview_status))
     if save_status != 'ignore':
+        if save_status == 'overwrite':
+            changed = False
         save_user_dict(user_code, user_dict, yaml_filename, secret=secret, changed=changed, encrypt=encrypted, steps=steps)
         if user_dict.get('multi_user', False) is True and encrypted is True:
             encrypted = False
@@ -7156,7 +7184,7 @@ def index(action_argument=None):
     if response_to_send is not None:
         release_lock(user_code, yaml_filename)
         if return_fake_html:
-            fake_up(response_to_send)
+            fake_up(response_to_send, interview_language)
         if response_wrapper:
             response_wrapper(response_to_send)
         return response_to_send
@@ -7167,7 +7195,7 @@ def index(action_argument=None):
         for classname, message in messages:
             if classname == 'error':
                 classname = 'danger'
-            flash_content += '<div class="alert alert-' + classname + '"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>' + message + '</div>'
+            flash_content += '<div class="alert alert-' + classname + '"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>' + str(message) + '</div>'
         flash_content += '</div>'
     if 'reload_after' in interview_status.extras:
         reload_after = 1000 * int(interview_status.extras['reload_after'])
@@ -7286,6 +7314,13 @@ def index(action_argument=None):
       var daCheckinCode = null;
       var daCheckingIn = 0;
       var daShowingHelp = 0;
+      var daIframeEmbed;
+      if ( window.location !== window.parent.location ) {
+        daIframeEmbed = true;
+      }
+      else {
+        daIframeEmbed = false;
+      }
       var daJsEmbed = """ + (json.dumps(js_target) if is_js else 'false') + """;
       var daAllowGoingBack = """ + ('true' if allow_going_back else 'false') + """;
       var daSteps = """ + str(steps) + """;
@@ -7347,6 +7382,7 @@ def index(action_argument=None):
         }
         return allFields;
       }
+      var daGetFields = getFields;
       function getField(fieldName){
         if (typeof daValLookup[fieldName] == "undefined"){
           var fieldNameEscaped = btoa(fieldName).replace(/[\\n=]/g, '');//.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
@@ -7373,8 +7409,9 @@ def index(action_argument=None):
         }
         return elem;
       }
+      var daGetField = getField;
       function setField(fieldName, val){
-        var elem = getField(fieldName);
+        var elem = daGetField(fieldName);
         if (elem == null){
           console.log('setField: reference to non-existent field ' + fieldName);
           return;
@@ -7417,8 +7454,9 @@ def index(action_argument=None):
           }
         }
       }
+      var daSetField = setField;
       function val(fieldName){
-        var elem = getField(fieldName);
+        var elem = daGetField(fieldName);
         if (elem == null){
           return null;
         }
@@ -7454,6 +7492,7 @@ def index(action_argument=None):
         }
         return theVal;
       }
+      var da_val = val;
       function daFormAsJSON(){
         var formData = $("#daform").serializeArray();
         var data = Object();
@@ -7508,6 +7547,7 @@ def index(action_argument=None):
           }
         }
       }
+      var da_flash = flash;
       function url_action(action, args){
         if (args == null){
           args = {};
@@ -7522,6 +7562,7 @@ def index(action_argument=None):
         }
         return url;
       }
+      var da_url_action = url_action;
       function action_call(action, args, callback){
         if (args == null){
             args = {};
@@ -7552,6 +7593,7 @@ def index(action_argument=None):
           }
         });
       }
+      var da_action_call = action_call;
       var url_action_call = action_call;
       function action_perform(action, args){
         if (args == null){
@@ -7580,6 +7622,7 @@ def index(action_argument=None):
           dataType: 'json'
         });
       }
+      var da_action_perform = action_perform;
       var url_action_perform = action_perform;
       function action_perform_with_next(action, args, next_data){
         //console.log("action_perform_with_next: " + action + " | " + next_data)
@@ -7609,6 +7652,7 @@ def index(action_argument=None):
           dataType: 'json'
         });
       }
+      var da_action_perform_with_next = action_perform_with_next;
       var url_action_perform_with_next = action_perform_with_next;
       function get_interview_variables(callback){
         if (callback == null){
@@ -7629,6 +7673,7 @@ def index(action_argument=None):
           }
         });
       }
+      var da_get_interview_variables = get_interview_variables;
       function daInformAbout(subject, chatMessage){
         if (subject in daInformed || (subject != 'chatmessage' && !daIsUser)){
           return;
@@ -8413,16 +8458,11 @@ def index(action_argument=None):
         if (e.which == 13){
           if (daShowingHelp == 0){
             var tag = $( document.activeElement ).prop("tagName");
-            if ($("#daform button.daquestionbackbutton").length > 0 && (tag != "TEXTAREA" && tag != "A" && tag != "LABEL" && tag != "BUTTON")){
-              e.preventDefault();
-              e.stopPropagation();
-              return false;
-            }
             if (tag != "INPUT" && tag != "TEXTAREA" && tag != "A" && tag != "LABEL" && tag != "BUTTON"){
               e.preventDefault();
               e.stopPropagation();
-              if ($("#daform .da-field-buttons button").length == 1){
-                $("#daform .da-field-buttons button").click();
+              if ($("#daform .da-field-buttons button").not('.danonsubmit').length == 1){
+                $("#daform .da-field-buttons button").not('.danonsubmit').click();
               }
               return false;
             }
@@ -8448,6 +8488,9 @@ def index(action_argument=None):
           clearTimeout(daDisable);
         }
         daCsrf = data.csrf_token;
+        if (data.question_data){
+          daQuestionData = data.question_data;
+        }
         if (data.action == 'body'){""" + forceFullScreen + """
           if ("activeElement" in document){
             document.activeElement.blur();
@@ -8470,7 +8513,7 @@ def index(action_argument=None):
           daChatPartnerRoles = data.livehelp.partner_roles;
           daSteps = data.steps;
           //console.log("daProcessAjax: pushing " + daSteps);
-          if (!daJsEmbed){
+          if (!daJsEmbed && !daIframeEmbed){
             if (history.state != null && daSteps > history.state.steps){
               history.pushState({steps: daSteps}, data.browser_title + " - page " + daSteps, locationBar + "#page" + daSteps);
             }
@@ -8592,7 +8635,7 @@ def index(action_argument=None):
       function daReviewAction(e){
         //action_perform_with_next($(this).data('action'), null, daNextAction);
         var info = $.parseJSON(atob($(this).data('action')));
-        action_perform(info['action'], info['arguments']);
+        da_action_perform(info['action'], info['arguments']);
         e.preventDefault();
         return false;
       }
@@ -8760,7 +8803,7 @@ def index(action_argument=None):
               else if (command.extra == 'fields'){
                 for (var key in command.value){
                   if (command.value.hasOwnProperty(key)){
-                    setField(key, command.value[key]);
+                    daSetField(key, command.value[key]);
                   }
                 }
               }
@@ -8974,10 +9017,10 @@ def index(action_argument=None):
             globalEval(message.message);
           }
           else if (message.priority == 'success' || message.priority == 'warning' || message.priority == 'danger' || message.priority == 'secondary' || message.priority == 'info' || message.priority == 'secondary' || message.priority == 'dark' || message.priority == 'light' || message.priority == 'primary'){
-            flash(message.message, message.priority);
+            da_flash(message.message, message.priority);
           }
           else{
-            flash(message.message, 'info');
+            da_flash(message.message, 'info');
           }
         }
       }
@@ -9076,7 +9119,7 @@ def index(action_argument=None):
           daFetchAjaxTimeoutRunning = true;
           daFetchAjaxTimeoutFetchAfter = false;
         }
-        action_call(cb.$source.data('action'), {wordstart: wordStart}, function(data){
+        da_action_call(cb.$source.data('action'), {wordstart: wordStart}, function(data){
           wordStart = $(elem).val();
           if (typeof data == "object"){
             var upperWordStart = wordStart.toUpperCase()
@@ -9239,6 +9282,7 @@ def index(action_argument=None):
             $(this).parent().find("button.dacollectremove").removeClass("dainvisible");
             $(this).parent().find("span.dacollectnum").removeClass("dainvisible");
             $(this).addClass("dainvisible");
+            $(".da-first-delete").removeClass("dainvisible");
             rationalizeListCollect();
             $('div[data-collectnum="' + num + '"]').find('input, textarea, select').first().focus();
           }
@@ -9303,7 +9347,9 @@ def index(action_argument=None):
           if (theVal.indexOf('.') >= 0 || theVal.indexOf(',') >= 0){
             var num = parseFloat(theVal);
             var cleanNum = num.toFixed(""" + str(daconfig.get('currency decimal places', 2)) + """);
-            $(this).val(cleanNum);
+            if (cleanNum != 'NaN') {
+              $(this).val(cleanNum);
+            }
           }
         });
         if (navigator.userAgent.match(/(iPad|iPhone|iPod touch);/i)) {
@@ -9495,7 +9541,7 @@ def index(action_argument=None):
         });
         $(".danavlinks a.daclickable").click(function(e){
           var the_key = $(this).data('key');
-          action_perform("_da_priority_action", {_action: the_key});
+          da_action_perform("_da_priority_action", {_action: the_key});
           e.preventDefault();
           return false;
         });
@@ -9967,7 +10013,7 @@ def index(action_argument=None):
       $(document).ready(function(){
         daInitialize(1);
         //console.log("ready: replaceState " + daSteps);
-        if (!daJsEmbed){
+        if (!daJsEmbed && !daIframeEmbed){
           history.replaceState({steps: daSteps}, "", locationBar + "#page" + daSteps);
         }
         var daReloadAfter = """ + str(int(reload_after)) + """;
@@ -10187,6 +10233,8 @@ def index(action_argument=None):
         for info in docassemble.base.functions.custom_types.values():
             if isinstance(info['javascript'], str):
                 the_js += "\n" + indent_by(info['javascript'].strip(), 6).rstrip()
+        if interview_status.question.interview.options.get('send question data', False):
+            the_js += "\n      daQuestionData = " + json.dumps(interview_status.as_data(user_dict))
         scripts += """
     <script type="text/javascript" charset="utf-8">
 """ + the_js + """
@@ -10194,7 +10242,7 @@ def index(action_argument=None):
     if interview_status.question.language != '*':
         interview_language = interview_status.question.language
     else:
-        interview_language = DEFAULT_LANGUAGE
+        interview_language = current_language
     validation_rules = {'rules': {}, 'messages': {}, 'errorClass': 'da-has-error', 'debug': False}
     interview_status.exit_url = title_info.get('exit url', None)
     interview_status.exit_link = title_info.get('exit link', 'exit')
@@ -10209,6 +10257,11 @@ def index(action_argument=None):
     the_main_page_parts = main_page_parts.get(interview_language, main_page_parts.get('*'))
     interview_status.pre = title_info.get('pre', the_main_page_parts['main page pre'])
     interview_status.post = title_info.get('post', the_main_page_parts['main page post'])
+    interview_status.footer = title_info.get('footer', the_main_page_parts['main page footer'] or get_part('global footer'))
+    if interview_status.footer:
+        interview_status.footer = re.sub(r'</?p.*?>', '', str(interview_status.footer), flags=re.IGNORECASE).strip()
+        if interview_status.footer == 'off':
+            interview_status.footer = ''
     interview_status.submit = title_info.get('submit', the_main_page_parts['main page submit'])
     bootstrap_theme = interview_status.question.interview.get_bootstrap_theme()
     if not is_ajax:
@@ -10231,6 +10284,8 @@ def index(action_argument=None):
         bodyclass += ' ' + re.sub(r'[^A-Za-z0-9\_]+', '-', interview_status.extras['cssClass'])
     elif hasattr(interview_status.question, 'id'):
         bodyclass += ' question-' + re.sub(r'[^A-Za-z0-9]+', '-', interview_status.question.id.lower())
+    if interview_status.footer:
+        bodyclass += ' da-pad-for-footer'
     if debug_mode:
         interview_status.screen_reader_text = dict()
     if 'speak_text' in interview_status.extras and interview_status.extras['speak_text']:
@@ -10271,7 +10326,6 @@ def index(action_argument=None):
     # if next_action_to_set:
     #     interview_status.next_action.append(next_action_to_set)
     if next_action_to_set:
-        logmessage("Setting the next_action")
         if 'event_stack' not in user_dict['_internal']:
             user_dict['_internal']['event_stack'] = dict()
         session_uid = interview_status.current_info['user']['session_uid']
@@ -10311,7 +10365,7 @@ def index(action_argument=None):
         for question_type in ('question', 'help'):
             if question_type not in interview_status.screen_reader_text:
                 continue
-            phrase = to_text(interview_status.screen_reader_text[question_type]) #.encode('utf-8')
+            phrase = to_text(interview_status.screen_reader_text[question_type])
             if (not phrase) or len(phrase) < 10:
                 phrase = "The sky is blue."
             phrase = re.sub(r'[^A-Za-z 0-9\.\,\?\#\!\%\&\(\)]', r' ', phrase)
@@ -10324,11 +10378,11 @@ def index(action_argument=None):
                                           ('Linsear Write Formula', textstat.linsear_write_formula(phrase)),
                                           ('Dale-Chall Readability Score', textstat.dale_chall_readability_score(phrase)),
                                           ('Readability Consensus', textstat.text_standard(phrase))]
-        readability_report = '          <h3>Readability</h3>\n'
+        readability_report = '          <h3>' + word("Readability") + '</h3>\n'
         for question_type in ('question', 'help'):
             if question_type in readability:
                 readability_report += '          <table style="display: none;" class="table" id="dareadability-' + question_type +'">' + "\n"
-                readability_report += '            <tr><th>Formula</th><th>Score</th></tr>' + "\n"
+                readability_report += '            <tr><th>' + word("Formula") + '</th><th>' + word("Score") + '</th></tr>' + "\n"
                 for read_type, value in readability[question_type]:
                     readability_report += '            <tr><td>' + read_type +'</td><td>' + str(value) + "</td></tr>\n"
                 readability_report += '          </table>' + "\n"
@@ -10439,8 +10493,10 @@ def index(action_argument=None):
                 if question_type in interview_status.screen_reader_text:
                     output += '<pre style="white-space: pre-wrap;">' + to_text(interview_status.screen_reader_text[question_type]) + '</pre>\n'
         output += '          <h3>' + word('Source code for question') + '</h3>' + "\n"
+        if interview_status.question.from_source.path != interview.source.path and interview_status.question.from_source.path is not None:
+            output += '          <p style="font-weight: bold;"><small>(' + word('from') + ' ' + interview_status.question.from_source.path +")</small></p>\n"
         if (not hasattr(interview_status.question, 'source_code')) or interview_status.question.source_code is None:
-            output += word('unavailable')
+            output += '          <p>' + word('unavailable') + '</p>'
         else:
             output += highlight(interview_status.question.source_code, YamlLexer(), HtmlFormatter())
         if len(interview_status.seeking) > 1:
@@ -10449,8 +10505,16 @@ def index(action_argument=None):
         output += '        </div>' + "\n"
         output += '      </div>' + "\n"
     output += '    </div>'
+    if interview_status.footer:
+        output += """
+    <footer class="bg-light dafooter">
+      <div class="container">
+        """ + interview_status.footer + """
+      </div>
+    </footer>
+"""
     if not is_ajax:
-        end_output = scripts + global_js + "\n" + indent_by("".join(interview_status.extra_scripts).strip(), 4).rstrip() + "\n  </div>" + "\n  </body>\n</html>"
+        end_output = scripts + global_js + "\n" + indent_by("".join(interview_status.extra_scripts).strip(), 4).rstrip() + "\n  </div>\n  </body>\n</html>"
     if True:
         key = 'da:html:uid:' + str(user_code) + ':i:' + str(yaml_filename) + ':userid:' + str(the_user_id)
         pipe = r.pipeline()
@@ -10475,11 +10539,14 @@ def index(action_argument=None):
             do_action = interview_status.question.checkin
         else:
             do_action = None
-        response = jsonify(action='body', body=output, extra_scripts=interview_status.extra_scripts, extra_css=interview_status.extra_css, browser_title=interview_status.tabtitle, lang=interview_language, bodyclass=bodyclass, reload_after=reload_after, livehelp=user_dict['_internal']['livehelp'], csrf_token=generate_csrf(), do_action=do_action, steps=steps, allow_going_back=allow_going_back, message_log=docassemble.base.functions.get_message_log(), id_dict=question_id_dict)
+        if interview_status.question.interview.options.get('send question data', False):
+            response = jsonify(action='body', body=output, extra_scripts=interview_status.extra_scripts, extra_css=interview_status.extra_css, browser_title=interview_status.tabtitle, lang=interview_language, bodyclass=bodyclass, reload_after=reload_after, livehelp=user_dict['_internal']['livehelp'], csrf_token=generate_csrf(), do_action=do_action, steps=steps, allow_going_back=allow_going_back, message_log=docassemble.base.functions.get_message_log(), id_dict=question_id_dict, question_data=interview_status.as_data(user_dict))
+        else:
+            response = jsonify(action='body', body=output, extra_scripts=interview_status.extra_scripts, extra_css=interview_status.extra_css, browser_title=interview_status.tabtitle, lang=interview_language, bodyclass=bodyclass, reload_after=reload_after, livehelp=user_dict['_internal']['livehelp'], csrf_token=generate_csrf(), do_action=do_action, steps=steps, allow_going_back=allow_going_back, message_log=docassemble.base.functions.get_message_log(), id_dict=question_id_dict)
         if response_wrapper:
             response_wrapper(response)
         if return_fake_html:
-            fake_up(response)
+            fake_up(response, interview_language)
     elif is_js:
         output = the_js + "\n" + append_javascript
         if 'global css' in daconfig:
@@ -10554,8 +10621,8 @@ def add_permissions_for_field(the_field, interview_status, files_to_process):
                 for (filename, file_number, mimetype, extension) in files_to_process:
                     file_privilege_access(file_number, allow=permissions['allow_privileges'])
 
-def fake_up(response):
-    response.set_data('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Response</title></head><body><pre>ABCDABOUNDARYSTARTABC' + codecs.encode(response.get_data(), 'base64').decode() + 'ABCDABOUNDARYENDABC</pre></body></html>')
+def fake_up(response, interview_language):
+    response.set_data('<!DOCTYPE html><html lang="' + interview_language + '"><head><meta charset="utf-8"><title>Response</title></head><body><pre>ABCDABOUNDARYSTARTABC' + codecs.encode(response.get_data(), 'base64').decode() + 'ABCDABOUNDARYENDABC</pre></body></html>')
     response.headers['Content-type'] = 'text/html; charset=utf-8'
 
 def add_action_to_stack(interview_status, user_dict, action, arguments):
@@ -10591,14 +10658,15 @@ def get_history(interview, interview_status):
     else:
         has_question = False
     index = 0
-    if len(interview_status.seeking):
+    seeking_len = len(interview_status.seeking)
+    if seeking_len:
         starttime = interview_status.seeking[0]['time']
         for stage in interview_status.seeking:
             index += 1
-            if index < len(interview_status.seeking) and 'reason' in interview_status.seeking[index] and interview_status.seeking[index]['reason'] == 'asking' and interview_status.seeking[index]['question'] is stage['question']:
+            if index < seeking_len and 'reason' in interview_status.seeking[index] and interview_status.seeking[index]['reason'] in ('asking', 'running') and interview_status.seeking[index]['question'] is stage['question'] and 'question' in stage and 'reason' in stage and stage['reason'] == 'considering':
                 continue
             the_time = " at %.5fs" % (stage['time'] - starttime)
-            if 'question' in stage and 'reason' in stage and (has_question is False or stage['question'] is not interview_status.question):
+            if 'question' in stage and 'reason' in stage and (has_question is False or index < (seeking_len - 1) or stage['question'] is not interview_status.question):
                 if stage['reason'] == 'initial':
                     output += "          <h5>Ran initial code" + the_time + "</h5>\n"
                 elif stage['reason'] == 'mandatory question':
@@ -10607,8 +10675,10 @@ def get_history(interview, interview_status):
                     output += "          <h5>Tried to run mandatory code" + the_time + "</h5>\n"
                 elif stage['reason'] == 'asking':
                     output += "          <h5>Tried to ask question" + the_time + "</h5>\n"
+                elif stage['reason'] == 'running':
+                    output += "          <h5>Tried to run block" + the_time + "</h5>\n"
                 elif stage['reason'] == 'considering':
-                    output += "          <h5>Considered asking question" + the_time + "</h5>\n"
+                    output += "          <h5>Considered using block" + the_time + "</h5>\n"
                 elif stage['reason'] == 'objects from file':
                     output += "          <h5>Tried to load objects from file" + the_time + "</h5>\n"
                 elif stage['reason'] == 'data':
@@ -10617,7 +10687,7 @@ def get_history(interview, interview_status):
                     output += "          <h5>Tried to load objects" + the_time + "</h5>\n"
                 elif stage['reason'] == 'result of multiple choice':
                     output += "          <h5>Followed the result of multiple choice selection" + the_time + "</h5>\n"
-                if stage['question'].from_source.path != interview.source.path:
+                if stage['question'].from_source.path != interview.source.path and stage['question'].from_source.path is not None:
                     output += '          <p style="font-weight: bold;"><small>(' + word('from') + ' ' + stage['question'].from_source.path +")</small></p>\n"
                 if (not hasattr(stage['question'], 'source_code')) or stage['question'].source_code is None:
                     output += word('(embedded question, source code not available)')
@@ -10674,6 +10744,14 @@ def utility_processor():
     if 'language' in session:
         docassemble.base.functions.set_language(session['language'])
         lang = session['language']
+    elif 'Accept-Language' in request.headers:
+        langs = docassemble.base.functions.parse_accept_language(request.headers['Accept-Language'])
+        if len(langs) > 0:
+            docassemble.base.functions.set_language(langs[0])
+            lang = langs[0]
+        else:
+            docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
+            lang = DEFAULT_LANGUAGE
     else:
         docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
         lang = DEFAULT_LANGUAGE
@@ -10806,6 +10884,7 @@ def interview_menu(absolute_urls=False, start_new=False, tag=None):
 def interview_start():
     if current_user.is_anonymous and not daconfig.get('allow anonymous access', True):
         return redirect(url_for('user.login', next=url_for('interview_start', **request.args)))
+    setup_translation()
     if len(daconfig['dispatch']) == 0:
         return redirect(url_for('index', i=final_default_yaml_filename))
     if ('json' in request.form and as_int(request.form['json'])) or ('json' in request.args and as_int(request.args['json'])):
@@ -10860,7 +10939,8 @@ def redirect_to_interview(dispatch):
     for arg in request.args:
         arguments[arg] = request.args[arg]
     arguments['i'] = yaml_filename
-    arguments['new_session'] = '1'
+    if 'session' not in arguments:
+        arguments['new_session'] = '1'
     request.args = arguments
     return index()
 
@@ -11118,6 +11198,7 @@ def do_serve_uploaded_pagescreen(number, page, download=False):
 @login_required
 @roles_required(['admin', 'advocate'])
 def visit_interview():
+    setup_translation()
     i = request.args.get('i', None)
     uid = request.args.get('uid', None)
     userid = request.args.get('userid', None)
@@ -11141,6 +11222,7 @@ def visit_interview():
 @login_required
 @roles_required(['admin', 'advocate'])
 def observer():
+    setup_translation()
     session['observer'] = 1
     i = request.args.get('i', None)
     uid = request.args.get('uid', None)
@@ -11269,6 +11351,7 @@ def observer():
         }
         return allFields;
       }
+      var daGetFields = getFields;
       function getField(fieldName){
         if (typeof daValLookup[fieldName] == "undefined"){
           var fieldNameEscaped = btoa(fieldName).replace(/[\\n=]/g, '');//.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
@@ -11295,8 +11378,9 @@ def observer():
         }
         return elem;
       }
+      var daGetField = getField;
       function setField(fieldName, val){
-        var elem = getField(fieldName);
+        var elem = daGetField(fieldName);
         if (elem == null){
           console.log('setField: reference to non-existent field ' + fieldName);
           return;
@@ -11339,6 +11423,7 @@ def observer():
           }
         }
       }
+      var daSetField = setField;
       function val(fieldName){
         var elem = getField(fieldName);
         if (elem == null){
@@ -11376,6 +11461,7 @@ def observer():
         }
         return theVal;
       }
+      var da_val = val;
       window.daTurnOnControl = function(){
         //console.log("Turning on control");
         daSendChanges = true;
@@ -11561,6 +11647,7 @@ def observer():
           }
         }
       }
+      var da_flash = flash;
       function JSON_stringify(s){
          var json = JSON.stringify(s);
          return json.replace(/[\\u007f-\\uffff]/g,
@@ -11584,6 +11671,7 @@ def observer():
         }
         return url;
       }
+      var da_url_action = url_action;
       function action_call(action, args, callback){
         //redo?
         if (args == null){
@@ -11611,6 +11699,7 @@ def observer():
           }
         });
       }
+      var da_action_call = action_call;
       var url_action_call = action_call;
       function action_perform(action, args){
         //redo
@@ -11636,6 +11725,7 @@ def observer():
           dataType: 'json'
         });
       }
+      var da_action_perform = action_perform;
       var url_action_perform = action_perform;
       function action_perform_with_next(action, args, next_data){
         //redo
@@ -11662,6 +11752,7 @@ def observer():
           dataType: 'json'
         });
       }
+      var da_action_perform_with_next = action_perform_with_next;
       var url_action_perform_with_next = action_perform_with_next;
       function get_interview_variables(callback){
         if (callback == null){
@@ -11678,6 +11769,7 @@ def observer():
           }
         });
       }
+      var da_get_interview_variables = get_interview_variables;
       function daInitialize(doScroll){
         if (daSpinnerTimeout != null){
           clearTimeout(daSpinnerTimeout);
@@ -11994,7 +12086,6 @@ def observer():
                 var scripts = tempDiv.getElementsByTagName('script');
                 for (var i = 0; i < scripts.length; i++){
                   if (scripts[i].src != ""){
-                    //console.log("Added script to head");
                     daAddScriptToHead(scripts[i].src);
                   }
                   else{
@@ -12086,7 +12177,7 @@ def observer():
     page_title = word('Observation')
     output = standard_html_start(interview_language=obj.get('lang', 'en'), debug=DEBUG, bootstrap_theme=obj.get('bootstrap_theme', None))
     output += obj.get('global_css', '') + "\n" + indent_by("".join(obj.get('extra_css', list())), 4)
-    output += '\n    <title>' + page_title + '</title>\n  </head>\n  <body class="' + obj.get('bodyclass', 'dabody da-pad-for-navbar') + '">\n  <div id="dabody">\n  '
+    output += '\n    <title>' + page_title + '</title>\n  </head>\n  <body class="' + obj.get('bodyclass', 'dabody da-pad-for-navbar da-pad-for-footer') + '">\n  <div id="dabody">\n  '
     output += obj.get('body', '')
     output += "    </div>\n    </div>" + standard_scripts(interview_language=obj.get('lang', 'en')) + observation_script + "\n    " + "".join(obj.get('extra_scripts', list())) + "\n  </body>\n</html>"
     response = make_response(output.encode('utf-8'), '200 OK')
@@ -12103,6 +12194,7 @@ def decode_dict(the_dict):
 @login_required
 @roles_required(['admin', 'advocate'])
 def monitor():
+    setup_translation()
     if request.method == 'GET' and needs_to_change_password():
         return redirect(url_for('user.change_password', next=url_for('monitor')))
     session['monitor'] = 1
@@ -13239,6 +13331,7 @@ def monitor():
 @login_required
 @roles_required(['admin', 'developer'])
 def update_package_wait():
+    setup_translation()
     next_url = request.args.get('next', url_for('update_package'))
     my_csrf = generate_csrf()
     script = """
@@ -13356,6 +13449,7 @@ def update_package_wait():
 def update_package_ajax():
     if 'taskwait' not in session:
         return jsonify(success=False)
+    setup_translation()
     result = docassemble.webapp.worker.workerapp.AsyncResult(id=session['taskwait'])
     if result.ready():
         #if 'taskwait' in session:
@@ -13427,6 +13521,7 @@ def get_package_name_from_zip(zippath):
 @login_required
 @roles_required(['admin', 'developer'])
 def update_package():
+    setup_translation()
     if not app.config['ALLOW_UPDATES']:
         return ('File not found', 404)
     if 'taskwait' in session:
@@ -13649,6 +13744,7 @@ def update_package():
 @login_required
 @roles_required(['admin', 'developer'])
 def create_playground_package():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     fix_package_folder()
@@ -14126,6 +14222,7 @@ def create_playground_package():
 @login_required
 @roles_required(['admin', 'developer'])
 def create_package():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     form = CreatePackageForm(request.form)
@@ -14398,6 +14495,7 @@ class Fruit(DAObject):
 @login_required
 @roles_required(['admin', 'developer'])
 def restart_page():
+    setup_translation()
     script = """
     <script>
       function daRestartCallback(data){
@@ -14428,6 +14526,7 @@ def restart_page():
 @login_required
 @roles_required(['admin', 'developer'])
 def playground_poll():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     script = """
@@ -14546,6 +14645,7 @@ class RedisCredStorage(oauth2client.client.Storage):
 @login_required
 @roles_required(['admin', 'developer'])
 def google_drive_callback():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     for key in request.args:
@@ -14727,6 +14827,7 @@ def trash_gd_file(section, filename, current_project):
 @login_required
 @roles_required(['admin', 'developer'])
 def sync_with_google_drive():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -14752,6 +14853,7 @@ def sync_with_google_drive():
 @login_required
 @roles_required(['admin', 'developer'])
 def gd_sync_wait():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -14858,6 +14960,7 @@ def gd_sync_wait():
 @login_required
 @roles_required(['admin', 'developer'])
 def onedrive_callback():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     for key in request.args:
@@ -14870,6 +14973,8 @@ def onedrive_callback():
         error = None
     elif 'error' in request.args:
         error = request.args['error']
+        if 'error_description' in request.args:
+            error += '; ' + str(request.args['error_description'])
     else:
         error = word("could not connect to OneDrive")
     if error:
@@ -15136,6 +15241,7 @@ def trash_od_file(section, filename, current_project):
 @login_required
 @roles_required(['admin', 'developer'])
 def sync_with_onedrive():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -15161,6 +15267,7 @@ def sync_with_onedrive():
 @login_required
 @roles_required(['admin', 'developer'])
 def od_sync_wait():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -15287,6 +15394,7 @@ def add_br(text):
 def checkin_sync_with_google_drive():
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     if 'taskwait' not in session:
         return jsonify(success=False)
     result = docassemble.webapp.worker.workerapp.AsyncResult(id=session['taskwait'])
@@ -15318,6 +15426,7 @@ def checkin_sync_with_google_drive():
 def checkin_sync_with_onedrive():
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     if 'taskwait' not in session:
         return jsonify(success=False)
     result = docassemble.webapp.worker.workerapp.AsyncResult(id=session['taskwait'])
@@ -15347,6 +15456,7 @@ def checkin_sync_with_onedrive():
 @login_required
 @roles_required(['admin', 'developer'])
 def google_drive_page():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     if app.config['USE_GOOGLE_DRIVE'] is False:
@@ -15474,6 +15584,7 @@ def gd_fix_subdirs(service, the_folder):
 @login_required
 @roles_required(['admin', 'developer'])
 def onedrive_page():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     if app.config['USE_ONEDRIVE'] is False:
@@ -15608,6 +15719,7 @@ def od_fix_subdirs(http, the_folder):
 @login_required
 @roles_required(['admin'])
 def config_page():
+    setup_translation()
     form = ConfigForm(request.form)
     content = None
     ok = True
@@ -15662,6 +15774,7 @@ def config_page():
 @login_required
 @roles_required(['developer', 'admin'])
 def view_source():
+    setup_translation()
     source_path = request.args.get('i', None)
     current_project = get_current_project()
     if source_path is None:
@@ -15713,6 +15826,7 @@ def playground_static(current_project, userid, filename):
 def playground_modules(current_project, userid, filename):
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     #filename = re.sub(r'[^A-Za-z0-9\-\_\. ]', '', filename)
     try:
         attach = int(request.args.get('attach', 0))
@@ -15740,6 +15854,7 @@ def playground_modules(current_project, userid, filename):
 def playground_sources(current_project, userid, filename):
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     try:
         attach = int(request.args.get('attach', 0))
     except:
@@ -15769,6 +15884,7 @@ def playground_template(current_project, userid, filename):
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     #filename = re.sub(r'[^A-Za-z0-9\-\_\. ]', '', filename)
+    setup_translation()
     try:
         attach = int(request.args.get('attach', 0))
     except:
@@ -15795,6 +15911,7 @@ def playground_template(current_project, userid, filename):
 def playground_download(current_project, userid, filename):
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     #filename = re.sub(r'[^A-Za-z0-9\-\_\. ]', '', filename)
     area = SavedFile(userid, fix=True, section='playground')
     the_directory = directory_for(area, current_project)
@@ -15814,6 +15931,7 @@ def playground_download(current_project, userid, filename):
 
 @app.route('/officefunctionfile', methods=['GET', 'POST'])
 def playground_office_functionfile():
+    docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     response = make_response(render_template('pages/officefunctionfile.html', current_project=get_current_project(), page_title=word("Docassemble Playground"), tab_title=word("Playground"), parent_origin=daconfig.get('office addin url', daconfig.get('url root', get_base_url()))), 200)
@@ -15822,6 +15940,7 @@ def playground_office_functionfile():
 
 @app.route('/officetaskpane', methods=['GET', 'POST'])
 def playground_office_taskpane():
+    docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     defaultDaServer = url_for('rootindex', _external=True)
@@ -15833,6 +15952,7 @@ def playground_office_taskpane():
 @login_required
 @roles_required(['developer', 'admin'])
 def playground_office_addin():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -15914,6 +16034,7 @@ def cloud_trash(use_gd, use_od, section, the_file, current_project):
 @login_required
 @roles_required(['developer', 'admin'])
 def playground_files():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -16156,6 +16277,8 @@ def playground_files():
             mode = 'null'
     if mode != 'markdown':
         active_file = None
+    if section == 'modules':
+        mode = 'python'
     formtwo.original_file_name.data = the_file
     formtwo.file_name.data = the_file
     if the_file != '' and os.path.isfile(os.path.join(the_directory, the_file)):
@@ -16376,6 +16499,7 @@ def playground_files():
 @login_required
 @roles_required(['developer', 'admin'])
 def pull_playground_package():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     current_project = get_current_project()
@@ -16385,7 +16509,7 @@ def pull_playground_package():
             if form.github_url.data and form.pypi.data:
                 flash(word("You cannot pull from GitHub and PyPI at the same time.  Please fill in one and leave the other blank."), 'error')
             elif form.github_url.data:
-                return redirect(url_for('playground_packages', project=current_project, pull='1', github_url=form.github_url.data, branch=form.github_branch.data))
+                return redirect(url_for('playground_packages', project=current_project, pull='1', github_url=re.sub(r'/*$', '', str(form.github_url.data).strip()), branch=form.github_branch.data))
             elif form.pypi.data:
                 return redirect(url_for('playground_packages', project=current_project, pull='1', pypi=form.pypi.data))
         if form.cancel.data:
@@ -16451,7 +16575,7 @@ def get_git_branches():
         github_auth = r.get('da:using_github:userid:' + str(current_user.id))
     else:
         github_auth = None
-    repo_name = request.args['url']
+    repo_name = re.sub(r'/*$', '', request.args['url'].strip())
     m = re.search(r'//(.+):x-oauth-basic@github.com', repo_name)
     if m:
         access_token = m.group(1)
@@ -16586,6 +16710,7 @@ def fix_package_folder():
 def playground_packages():
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     fix_package_folder()
     current_project = get_current_project()
     form = PlaygroundPackagesForm(request.form)
@@ -16753,7 +16878,7 @@ def playground_packages():
             http = credentials.authorize(httplib2.Http())
             resp, content = http.request("https://api.github.com/user", "GET")
             if int(resp['status']) == 200:
-                info = json.loads(content.decode())
+                info = json.loads(content.decode('utf-8', 'ignore'))
                 github_user_name = info.get('login', None)
                 github_author_name = info.get('name', None)
                 github_email = info.get('email', None)
@@ -16762,7 +16887,7 @@ def playground_packages():
             if github_email is None:
                 resp, content = http.request("https://api.github.com/user/emails", "GET")
                 if int(resp['status']) == 200:
-                    info = json.loads(content.decode())
+                    info = json.loads(content.decode('utf-8', 'ignore'))
                     for item in info:
                         if item.get('email', None) and item.get('visibility', None) != 'private':
                             github_email = item['email']
@@ -17835,6 +17960,65 @@ function variablesReady(){
 """
     return output
 
+@app.route("/varsreport", methods=['GET'])
+@login_required
+@roles_required(['admin', 'developer'])
+def variables_report():
+    if not app.config['ENABLE_PLAYGROUND']:
+        return ('File not found', 404)
+    setup_translation()
+    playground = SavedFile(current_user.id, fix=True, section='playground')
+    the_file = request.args.get('file', None)
+    current_project = request.args.get('project', 'default')
+    the_directory = directory_for(playground, current_project)
+    files = sorted([f for f in os.listdir(the_directory) if os.path.isfile(os.path.join(the_directory, f)) and re.search(r'^[A-Za-z0-9]', f)])
+    if len(files) == 0:
+        return jsonify(success=False, reason=1)
+    if the_file is None or the_file not in files:
+        return jsonify(success=False, reason=2)
+    interview_source = docassemble.base.parse.interview_source_from_string('docassemble.playground' + str(current_user.id) + project_name(current_project) + ':' + the_file)
+    interview_source.set_testing(True)
+    interview = interview_source.get_interview()
+    ensure_ml_file_exists(interview, the_file, current_project)
+    yaml_file = 'docassemble.playground' + str(current_user.id) + project_name(current_project) + ':' + the_file
+    interview_status = docassemble.base.parse.InterviewStatus(current_info=current_info(yaml=yaml_file, req=request, action=None))
+    variables_html, vocab_list, vocab_dict = get_vars_in_use(interview, interview_status, debug_mode=False, current_project=current_project)
+    results = list()
+    result_dict = dict()
+    for name in vocab_list:
+        if name in ('x', 'row_item', 'i', 'j', 'k', 'l', 'm', 'n') or name.startswith('x.') or name.startswith('x[') or name.startswith('row_item.'):
+            continue
+        result = dict(name=name, questions=list())
+        results.append(result)
+        result_dict[name] = result
+    for question in interview.questions_list:
+        names_seen = dict()
+        for the_type, the_set in (('in mako', question.mako_names), ('mentioned in', question.names_used), ('defined by', question.fields_used)):
+            for name in the_set:
+                the_name = name
+                subnames = [the_name]
+                while True:
+                    if re.search(r'\[[^\]]\]$', the_name):
+                        the_name = re.sub(r'\[[^\]]\]$', '', the_name)
+                    elif '.' in the_name:
+                        the_name = re.sub(r'\.[^\.]*$', '', the_name)
+                    else:
+                        break
+                    subnames.append(the_name)
+                on_first = True
+                for subname in subnames:
+                    if the_type == 'defined by' and not on_first:
+                        the_type = 'mentioned in'
+                    on_first = False
+                    if subname not in result_dict:
+                        continue
+                    if subname not in names_seen:
+                        names_seen[subname] = dict(yaml_file=question.from_source.path, source_code=question.source_code.strip(), usage=list())
+                        result_dict[subname]['questions'].append(names_seen[subname])
+                    if the_type not in names_seen[subname]['usage']:
+                        names_seen[subname]['usage'].append(the_type)
+    return jsonify(success=True, yaml_file=yaml_file, items=results)
+
 @app.route('/playgroundvariables', methods=['POST'])
 @login_required
 @roles_required(['developer', 'admin'])
@@ -17842,6 +18026,7 @@ def playground_variables():
     current_project = get_current_project()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     playground = SavedFile(current_user.id, fix=True, section='playground')
     the_directory = directory_for(playground, current_project)
     files = sorted([f for f in os.listdir(the_directory) if os.path.isfile(os.path.join(the_directory, f)) and re.search(r'^[A-Za-z0-9]', f)])
@@ -17907,6 +18092,7 @@ def assign_opacity(files):
 def playground_page_run():
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
+    setup_translation()
     current_project = get_current_project()
     the_file = request.args.get('file')
     if the_file:
@@ -17956,6 +18142,7 @@ def delete_project(user_id, project_name):
 @login_required
 @roles_required(['developer', 'admin'])
 def playground_project():
+    setup_translation()
     if app.config['USE_ONEDRIVE'] is False or get_od_folder() is None:
         use_od = False
     else:
@@ -18104,6 +18291,7 @@ def delete_variable_file(current_project):
 @login_required
 @roles_required(['developer', 'admin'])
 def playground_page():
+    setup_translation()
     current_project = get_current_project()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
@@ -18417,6 +18605,79 @@ function activateExample(id, scroll){
   $("#da-example-source-after").addClass("dainvisible");
 }
 
+function daFetchVariableReportCallback(data){
+  var translations = """ + json.dumps({'in mako': word("in mako"), 'mentioned in': word("mentioned in"), 'defined by': word("defined by")}) + """;
+  var modal = $("#daVariablesReport .modal-body");
+  if (modal.length == 0){
+    console.log("No modal body on page");
+    return;
+  }
+  if (!data.success){
+    $(modal).html('<p>""" + word("Failed to load report") + """</p>');
+    return;
+  }
+  var yaml_file = data.yaml_file;
+  console.log(yaml_file)
+  modal.empty();
+  var accordion = $('<div>');
+  accordion.addClass("accordion");
+  accordion.attr("id", "varsreport");
+  var n = data.items.length;
+  for (var i = 0; i < n; ++i){
+    var item = data.items[i];
+    if (item.questions.length){
+      var card = $('<div>');
+      card.addClass("card");
+      var cardHeader = $('<div>');
+      cardHeader.addClass("card-header");
+      cardHeader.attr("id", "cardheader" + i);
+      cardHeader.html('<h2 class="mb-0"><button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapse' + i + '" aria-expanded="false" aria-controls="collapse' + i + '">' + item.name + '</button></h2>');
+      card.append(cardHeader);
+      var collapse = $("<div>");
+      collapse.attr("id", "collapse" + i);
+      collapse.attr("aria-labelledby", "cardheader" + i);
+      collapse.data("parent", "#varsreport");
+      collapse.addClass("collapse");
+      var cardBody = $("<div>");
+      cardBody.addClass("card-body");
+      var m = item.questions.length;
+      for (var j = 0; j < m; j++){
+        var h5 = $("<h5>");
+        h5.html(item.questions[j].usage.map(x => translations[x]).join(','));
+        var pre = $("<pre>");
+        pre.html(item.questions[j].source_code);
+        cardBody.append(h5);
+        cardBody.append(pre);
+        if (item.questions[j].yaml_file != yaml_file){
+          var p = $("<p>");
+          p.html(""" + json.dumps(word("from")) + """ + ' ' + item.questions[j].yaml_file);
+          cardBody.append(p);
+        }
+      }
+      collapse.append(cardBody);
+      card.append(collapse);
+      accordion.append(card);
+    }
+  }
+  modal.append(accordion);
+}
+
+function daFetchVariableReport(){
+  url = """ + json.dumps(url_for('variables_report', project=current_project)) + """ + "&file=" + currentFile;
+  $("#daVariablesReport .modal-body").html('<p>""" + word("Loading . . .") + """</p>');
+  $.ajax({
+    type: "GET",
+    url: url,
+    success: daFetchVariableReportCallback,
+    xhrFields: {
+      withCredentials: true
+    },
+    error: function(xhr, status, error){
+      $("#daVariablesReport .modal-body").html('<p>""" + word("Failed to load report") + """</p>');
+    }
+  });
+}
+
 function saveCallback(data){
   if (data.action && data.action == 'reload'){
     location.reload(true);
@@ -18493,6 +18754,7 @@ $( document ).ready(function() {
     //event.preventDefault();
     return true;
   });
+  var thisWindow = window;
   $("#daRunSyncGD").click(function(event){
     daCodeMirror.save();
     $("#form").trigger("checkform.areYouSure");
@@ -18500,7 +18762,8 @@ $( document ).ready(function() {
       event.preventDefault();
       return false;
     }
-    window.location.replace('""" + url_for('sync_with_google_drive', project=current_project, auto_next=url_for('playground_page_run', file=the_file, project=current_project)) + """');
+    thisWindow.location.replace('""" + url_for('sync_with_google_drive', project=current_project, auto_next=url_for('playground_page_run', file=the_file, project=current_project)) + """');
+    return true;
   });
   $("#daRunSyncOD").click(function(event){
     daCodeMirror.save();
@@ -18509,7 +18772,7 @@ $( document ).ready(function() {
       event.preventDefault();
       return false;
     }
-    window.location.replace('""" + url_for('sync_with_onedrive', project=current_project, auto_next=url_for('playground_page_run', file=the_file, project=current_project)) + """');
+    thisWindow.location.replace('""" + url_for('sync_with_onedrive', project=current_project, auto_next=url_for('playground_page_run', file=the_file, project=current_project)) + """');
   });
   $("#form button[name='submit']").click(function(event){
     daCodeMirror.save();
@@ -18658,7 +18921,7 @@ $( document ).ready(function() {
     page_title = word("Playground")
     if current_project != 'default':
         page_title += " / " + current_project
-    response = make_response(render_template('pages/playground.html', projects=get_list_of_projects(current_user.id), current_project=current_project, version_warning=None, bodyclass='daadminbody', use_gd=use_gd, use_od=use_od, userid=current_user.id, page_title=Markup(page_title), tab_title=word("Playground"), extra_css=Markup('\n    <link href="' + url_for('static', filename='app/playgroundbundle.css', v=da_version) + '" rel="stylesheet">'), extra_js=Markup('\n    <script src="' + url_for('static', filename="app/playgroundbundle.js", v=da_version) + '"></script>\n    ' + kbLoad + cm_setup + '<script>\n      var daConsoleMessages = ' + json.dumps(console_messages) + ';\n      $("#daDelete").click(function(event){if(!confirm("' + word("Are you sure that you want to delete this playground file?") + '")){event.preventDefault();}});\n      daTextArea = document.getElementById("playground_content");\n      var daCodeMirror = CodeMirror.fromTextArea(daTextArea, {specialChars: /[\\u00a0\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u061c\\u200b-\\u200f\\u2028\\u2029\\ufeff]/, mode: "' + ('yamlmixed' if daconfig.get('test yamlmixed mode') else 'yamlmixed') + '", ' + kbOpt + 'tabSize: 2, tabindex: 70, autofocus: false, lineNumbers: true, matchBrackets: true, lineWrapping: ' + ('true' if daconfig.get('wrap lines in playground', True) else 'false') + '});\n      $(window).bind("beforeunload", function(){daCodeMirror.save(); $("#form").trigger("checkform.areYouSure");});\n      $("#form").areYouSure(' + json.dumps({'message': word("There are unsaved changes.  Are you sure you wish to leave this page?")}) + ');\n      $("#form").bind("submit", function(){daCodeMirror.save(); $("#form").trigger("reinitialize.areYouSure"); return true;});\n      daCodeMirror.setSize(null, null);\n      daCodeMirror.setOption("extraKeys", { Tab: function(cm) { var spaces = Array(cm.getOption("indentUnit") + 1).join(" "); cm.replaceSelection(spaces); }, "Ctrl-Space": "autocomplete", "F11": function(cm) { cm.setOption("fullScreen", !cm.getOption("fullScreen")); }, "Esc": function(cm) { if (cm.getOption("fullScreen")) cm.setOption("fullScreen", false); }});\n      daCodeMirror.setOption("coverGutterNextToScrollbar", true);\n' + indent_by(ajax, 6) + '\n      exampleData = JSON.parse(atob("' + pg_ex['encoded_data_dict'] + '"));\n      activateExample("' + str(pg_ex['pg_first_id'][0]) + '", false);\n    $("#my-form").trigger("reinitialize.areYouSure");\n    </script>'), form=form, fileform=fileform, files=sorted(files, key=lambda y: y['name'].lower()), any_files=any_files, pulldown_files=sorted(pulldown_files, key=lambda y: y.lower()), current_file=the_file, active_file=active_file, content=content, variables_html=Markup(variables_html), example_html=pg_ex['encoded_example_html'], interview_path=interview_path, is_new=str(is_new)), 200)
+    response = make_response(render_template('pages/playground.html', projects=get_list_of_projects(current_user.id), current_project=current_project, version_warning=None, bodyclass='daadminbody', use_gd=use_gd, use_od=use_od, userid=current_user.id, page_title=Markup(page_title), tab_title=word("Playground"), extra_css=Markup('\n    <link href="' + url_for('static', filename='app/playgroundbundle.css', v=da_version) + '" rel="stylesheet">'), extra_js=Markup('\n    <script src="' + url_for('static', filename="app/playgroundbundle.js", v=da_version) + '"></script>\n    ' + kbLoad + cm_setup + '<script>\n      var daConsoleMessages = ' + json.dumps(console_messages) + ';\n      $("#daDelete").click(function(event){if(!confirm("' + word("Are you sure that you want to delete this playground file?") + '")){event.preventDefault();}});\n      daTextArea = document.getElementById("playground_content");\n      var daCodeMirror = CodeMirror.fromTextArea(daTextArea, {specialChars: /[\\u00a0\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u061c\\u200b-\\u200f\\u2028\\u2029\\ufeff]/, mode: "' + ('yamlmixed' if daconfig.get('test yamlmixed mode') else 'yamlmixed') + '", ' + kbOpt + 'tabSize: 2, tabindex: 70, autofocus: false, lineNumbers: true, matchBrackets: true, lineWrapping: ' + ('true' if daconfig.get('wrap lines in playground', True) else 'false') + '});\n      $(window).bind("beforeunload", function(){daCodeMirror.save(); $("#form").trigger("checkform.areYouSure");});\n      $("#form").areYouSure(' + json.dumps({'message': word("There are unsaved changes.  Are you sure you wish to leave this page?")}) + ');\n      $("#form").bind("submit", function(){daCodeMirror.save(); $("#form").trigger("reinitialize.areYouSure"); return true;});\n      daCodeMirror.setSize(null, null);\n      daCodeMirror.setOption("extraKeys", { Tab: function(cm) { var spaces = Array(cm.getOption("indentUnit") + 1).join(" "); cm.replaceSelection(spaces); }, "Ctrl-Space": "autocomplete", "F11": function(cm) { cm.setOption("fullScreen", !cm.getOption("fullScreen")); }, "Esc": function(cm) { if (cm.getOption("fullScreen")) cm.setOption("fullScreen", false); }});\n      daCodeMirror.setOption("coverGutterNextToScrollbar", true);\n' + indent_by(ajax, 6) + '\n      exampleData = JSON.parse(atob("' + pg_ex['encoded_data_dict'] + '"));\n      activateExample("' + str(pg_ex['pg_first_id'][0]) + '", false);\n    $("#my-form").trigger("reinitialize.areYouSure");\n      $("#daVariablesReport").on("shown.bs.modal", function () { daFetchVariableReport(); })\n    </script>'), form=form, fileform=fileform, files=sorted(files, key=lambda y: y['name'].lower()), any_files=any_files, pulldown_files=sorted(pulldown_files, key=lambda y: y.lower()), current_file=the_file, active_file=active_file, content=content, variables_html=Markup(variables_html), example_html=pg_ex['encoded_example_html'], interview_path=interview_path, is_new=str(is_new)), 200)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     return response
 
@@ -18668,6 +18931,7 @@ def page_not_found_error(the_error):
 
 @app.errorhandler(Exception)
 def server_error(the_error):
+    setup_translation()
     if hasattr(the_error, 'interview') and the_error.interview.debug and hasattr(the_error, 'interview_status'):
         the_history = get_history(the_error.interview, the_error.interview_status)
     else:
@@ -18766,6 +19030,7 @@ def server_error(the_error):
           }, 3000);
         }
       }
+      var da_flash = flash;
       function daShowNotifications(){
         var n = daMessageLog.length;
         for (var i = 0; i < n; i++){
@@ -18777,10 +19042,10 @@ def server_error(the_error):
             globalEval(message.message);
           }
           else if (message.priority == 'success' || message.priority == 'warning' || message.priority == 'danger' || message.priority == 'secondary' || message.priority == 'info' || message.priority == 'secondary' || message.priority == 'dark' || message.priority == 'light' || message.priority == 'primary'){
-            flash(message.message, message.priority);
+            da_flash(message.message, message.priority);
           }
           else{
-            flash(message.message, 'info');
+            da_flash(message.message, 'info');
           }
         }
       }
@@ -18937,6 +19202,7 @@ def logfile(filename):
 @login_required
 @roles_required(['admin', 'developer'])
 def logs():
+    setup_translation()
     form = LogForm(request.form)
     use_zip = request.args.get('zip', None)
     if LOGSERVER is None and use_zip:
@@ -19038,6 +19304,7 @@ def logs():
 @app.route('/reqdev', methods=['GET', 'POST'])
 @login_required
 def request_developer():
+    setup_translation()
     if not app.config['ENABLE_PLAYGROUND']:
         return ('File not found', 404)
     from docassemble.webapp.users.forms import RequestDeveloperForm
@@ -19150,6 +19417,7 @@ def read_fields(filename, orig_file_name, input_format, output_format):
 @login_required
 @roles_required(['admin', 'developer'])
 def utilities():
+    setup_translation()
     form = Utilities(request.form)
     fields_output = None
     word_box = None
@@ -19383,6 +19651,7 @@ def ml_prefix(the_package, the_file):
 @login_required
 @roles_required(['admin', 'developer', 'trainer'])
 def train():
+    setup_translation()
     the_package = request.args.get('package', None)
     the_file = request.args.get('file', None)
     the_group_id = request.args.get('group_id', None)
@@ -19786,7 +20055,7 @@ def train():
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
         return response
 
-def user_interviews(user_id=None, secret=None, exclude_invalid=True, action=None, filename=None, session=None, tag=None, include_dict=True, delete_shared=False, admin=False):
+def user_interviews(user_id=None, secret=None, exclude_invalid=True, action=None, filename=None, session=None, tag=None, include_dict=True, delete_shared=False, admin=False, start_id=None):
     # logmessage("user_interviews: user_id is " + str(user_id) + " and secret is " + str(secret))
     if user_id is None and (current_user.is_anonymous or not current_user.has_role('admin', 'advocate')):
         raise Exception('user_interviews: only administrators and advocates can access information about other users')
@@ -19801,8 +20070,13 @@ def user_interviews(user_id=None, secret=None, exclude_invalid=True, action=None
     if action == 'delete_all':
         sessions_to_delete = set()
         if tag:
-            for interview_info in user_interviews(user_id=user_id, secret=secret, tag=tag, include_dict=False):
-                sessions_to_delete.add((interview_info['session'], interview_info['filename'], interview_info['user_id']))
+            start_id = None
+            while True:
+                (the_list, start_id) = user_interviews(user_id=user_id, secret=secret, tag=tag, include_dict=False, start_id=start_id)
+                for interview_info in the_list:
+                    sessions_to_delete.add((interview_info['session'], interview_info['filename'], interview_info['user_id']))
+                if start_id is None:
+                    break
         else:
             if user_id is None:
                 if filename is None:
@@ -19848,178 +20122,187 @@ def user_interviews(user_id=None, secret=None, exclude_invalid=True, action=None
         the_timezone = pytz.timezone(current_user.timezone)
     else:
         the_timezone = pytz.timezone(get_default_timezone())
-    subq = db.session.query(db.func.max(UserDict.indexno).label('indexno'), UserDict.filename, UserDict.key).group_by(UserDict.filename, UserDict.key).subquery()
-    if user_id is not None:
-        if include_dict:
-            if filename is not None:
-                if session is not None:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id, UserDictKeys.filename == filename, UserDictKeys.key == session).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno).order_by(UserDictKeys.indexno)
-                else:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id, UserDictKeys.filename == filename).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno).order_by(UserDictKeys.indexno)
-            else:
-                if session is not None:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id, UserDictKeys.key == session).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno).order_by(UserDictKeys.indexno)
-                else:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno).order_by(UserDictKeys.indexno)
-        else:
-            if filename is not None:
-                if session is not None:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.modtime, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id, UserDictKeys.filename == filename, UserDictKeys.key == session).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno)
-                else:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.modtime, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id, UserDictKeys.filename == filename).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno)
-            else:
-                if session is not None:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.modtime, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id, UserDictKeys.key == session).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno)
-                else:
-                    interview_query = db.session.query(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDict.modtime, UserModel.email).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(UserDictKeys.user_id == user_id).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno)
-    else:
-        if include_dict:
-            if filename is not None:
-                if session is not None:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).filter(UserDict.filename == filename, UserDict.key == session).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDict.modtime, UserModel.email)
-                else:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).filter(UserDict.filename == filename).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDict.modtime, UserModel.email)
-            else:
-                if session is not None:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).filter(UserDict.key == session).group_by(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno, UserModel.email, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDict.modtime, UserModel.email)
-                else:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).group_by(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno, UserModel.email, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDict.modtime, UserModel.email)
-        else:
-            if filename is not None:
-                if session is not None:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).filter(UserDict.filename == filename, UserDict.key == session).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.modtime, UserModel.email)
-                else:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).filter(UserDict.filename == filename).group_by(UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDictKeys.indexno, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.modtime, UserModel.email)
-            else:
-                if session is not None:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).filter(UserDict.key == session).group_by(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDictKeys.indexno, UserModel.email, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.modtime, UserModel.email)
-                else:
-                    interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True)).group_by(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDictKeys.indexno, UserModel.email, UserDict.modtime).order_by(UserDictKeys.indexno).with_entities(UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.modtime, UserModel.email)
-    #logmessage(str(interview_query))
-    interviews = list()
-    stored_info = list()
 
-    for interview_info in interview_query:
-        #logmessage("filename is " + str(interview_info.filename) + " " + str(interview_info.key))
-        if session is not None and interview_info.key != session:
-            continue
-        if include_dict and interview_info.dictionary is None:
-            continue
-        if include_dict:
-            stored_info.append(dict(filename=interview_info.filename,
-                                    encrypted=interview_info.encrypted,
-                                    dictionary=interview_info.dictionary,
-                                    key=interview_info.key,
-                                    email=interview_info.email,
-                                    user_id=interview_info.user_id,
-                                    temp_user_id=interview_info.temp_user_id))
+    interviews_length = 0
+    interviews = list()
+
+    while True:
+        there_are_more = False
+        subq = db.session.query(db.func.max(UserDict.indexno).label('indexno'), UserDict.filename, UserDict.key).group_by(UserDict.filename, UserDict.key).subquery()
+        if user_id is not None:
+            query_elements = [UserDict.indexno, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserModel.email]
+            filter_elements = [UserDictKeys.user_id == user_id]
+            group_elements = [UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDictKeys.filename, UserDictKeys.key, UserDictKeys.indexno, UserDict.indexno]
+            if include_dict:
+                query_elements.extend([UserDict.dictionary, UserDict.encrypted, UserModel.email])
+                group_elements.extend([UserDict.dictionary, UserDict.encrypted])
+            else:
+                query_elements.append(UserDict.modtime)
+                group_elements.append(UserDict.modtime)
+            if filename is not None:
+                filter_elements.append(UserDictKeys.filename == filename)
+            if session is not None:
+                filter_elements.append(UserDictKeys.key == session)
+            if start_id is not None:
+                filter_elements.append(UserDict.indexno > start_id)
+            interview_query = db.session.query(*query_elements).join(subq, and_(subq.c.filename == UserDictKeys.filename, subq.c.key == UserDictKeys.key)).join(UserDict, and_(UserDict.indexno == subq.c.indexno, UserDict.key == UserDictKeys.key, UserDict.filename == UserDictKeys.filename)).join(UserModel, UserModel.id == UserDictKeys.user_id).filter(and_(*filter_elements)).group_by(*group_elements).order_by(UserDict.indexno)
         else:
-            stored_info.append(dict(filename=interview_info.filename,
-                                    modtime=interview_info.modtime,
-                                    key=interview_info.key,
-                                    email=interview_info.email,
-                                    user_id=interview_info.user_id,
-                                    temp_user_id=interview_info.temp_user_id))
-    for interview_info in stored_info:
-        interview_title = dict()
-        is_valid = True
-        interview_valid = True
-        try:
-            interview = docassemble.base.interview_cache.get_interview(interview_info['filename'])
-        except Exception as the_err:
-            if exclude_invalid:
-                continue
-            logmessage("user_interviews: unable to load interview file " + interview_info['filename'])
-            interview_title['full'] = word('Error: interview not found')
-            interview_valid = False
-            is_valid = False
-        #logmessage("Found old interview with title " + interview_title)
-        if include_dict:
-            if interview_info['encrypted']:
-                try:
-                    dictionary = decrypt_dictionary(interview_info['dictionary'], secret)
-                except Exception as the_err:
-                    if exclude_invalid:
-                        continue
-                    try:
-                        logmessage("user_interviews: unable to decrypt dictionary.  " + str(the_err.__class__.__name__) + ": " + str(the_err))
-                    except:
-                        logmessage("user_interviews: unable to decrypt dictionary.  " + str(the_err.__class__.__name__))
-                    dictionary = fresh_dictionary()
-                    dictionary['_internal']['starttime'] = None
-                    dictionary['_internal']['modtime'] = None
-                    is_valid = False
-            else:
-                try:
-                    dictionary = unpack_dictionary(interview_info['dictionary'])
-                except Exception as the_err:
-                    if exclude_invalid:
-                        continue
-                    try:
-                        logmessage("user_interviews: unable to unpack dictionary.  " + str(the_err.__class__.__name__) + ": " + str(the_err))
-                    except:
-                        logmessage("user_interviews: unable to unpack dictionary.  " + str(the_err.__class__.__name__))
-                    dictionary = fresh_dictionary()
-                    dictionary['_internal']['starttime'] = None
-                    dictionary['_internal']['modtime'] = None
-                    is_valid = False
-            if not isinstance(dictionary, dict):
-                logmessage("user_interviews: found a dictionary that was not a dictionary")
-                continue
-        if is_valid:
+            filter_elements = []
+            group_elements = [UserDict.indexno, UserModel.email, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDictKeys.indexno, UserDict.modtime]
             if include_dict:
-                interview_title = interview.get_title(dictionary)
-                tags = interview.get_tags(dictionary)
-            else:
-                interview_title = interview.get_title(dict(_internal=dict()))
-                tags = interview.get_tags(dict(_internal=dict()))
-            metadata = copy.deepcopy(interview.consolidated_metadata)
-        elif interview_valid:
-            interview_title = interview.get_title(dict(_internal=dict()))
-            metadata = copy.deepcopy(interview.consolidated_metadata)
+                group_elements.extend([UserDict.dictionary, UserDict.encrypted])
+            if filename is not None:
+                filter_elements.append(UserDict.filename == filename)
+            if session is not None:
+                filter_elements.append(UserDict.key == session)
+            if start_id is not None:
+                filter_elements.append(UserDict.indexno > start_id)
+            interview_query = db.session.query(UserDict).join(subq, and_(UserDict.indexno == subq.c.indexno, UserDict.key == subq.c.key, UserDict.filename == subq.c.filename)).outerjoin(UserDictKeys, and_(UserDict.filename == UserDictKeys.filename, UserDict.key == UserDictKeys.key)).outerjoin(UserModel, and_(UserDictKeys.user_id == UserModel.id, UserModel.active == True))
+            if len(filter_elements) > 0:
+                interview_query = interview_query.filter(and_(*filter_elements))
+            interview_query = interview_query.group_by(*group_elements).order_by(UserDict.indexno).with_entities(UserDict.indexno, UserDictKeys.user_id, UserDictKeys.temp_user_id, UserDict.filename, UserDict.key, UserDict.dictionary, UserDict.encrypted, UserDict.modtime, UserModel.email)
+        interview_query = interview_query.limit(PAGINATION_LIMIT_PLUS_ONE)
+
+        stored_info = list()
+        results_in_query = 0
+        for interview_info in interview_query:
+            results_in_query += 1
+            if results_in_query == PAGINATION_LIMIT_PLUS_ONE:
+                there_are_more = True
+                break
+            #logmessage("filename is " + str(interview_info.filename) + " " + str(interview_info.key))
+            if session is not None and interview_info.key != session:
+                continue
+            if include_dict and interview_info.dictionary is None:
+                continue
             if include_dict:
-                tags = interview.get_tags(dictionary)
-                if 'full' not in interview_title:
-                    interview_title['full'] = word("Interview answers cannot be decrypted")
+                stored_info.append(dict(filename=interview_info.filename,
+                                        encrypted=interview_info.encrypted,
+                                        dictionary=interview_info.dictionary,
+                                        key=interview_info.key,
+                                        email=interview_info.email,
+                                        user_id=interview_info.user_id,
+                                        temp_user_id=interview_info.temp_user_id,
+                                        indexno=interview_info.indexno))
+            else:
+                stored_info.append(dict(filename=interview_info.filename,
+                                        modtime=interview_info.modtime,
+                                        key=interview_info.key,
+                                        email=interview_info.email,
+                                        user_id=interview_info.user_id,
+                                        temp_user_id=interview_info.temp_user_id,
+                                        indexno=interview_info.indexno))
+        for interview_info in stored_info:
+            if interviews_length == PAGINATION_LIMIT:
+                there_are_more = True
+                break
+            start_id = interview_info['indexno']
+            interview_title = dict()
+            is_valid = True
+            interview_valid = True
+            try:
+                interview = docassemble.base.interview_cache.get_interview(interview_info['filename'])
+            except Exception as the_err:
+                if exclude_invalid:
+                    continue
+                logmessage("user_interviews: unable to load interview file " + interview_info['filename'])
+                interview_title['full'] = word('Error: interview not found')
+                interview_valid = False
+                is_valid = False
+            #logmessage("Found old interview with title " + interview_title)
+            if include_dict:
+                if interview_info['encrypted']:
+                    try:
+                        dictionary = decrypt_dictionary(interview_info['dictionary'], secret)
+                    except Exception as the_err:
+                        if exclude_invalid:
+                            continue
+                        try:
+                            logmessage("user_interviews: unable to decrypt dictionary.  " + str(the_err.__class__.__name__) + ": " + str(the_err))
+                        except:
+                            logmessage("user_interviews: unable to decrypt dictionary.  " + str(the_err.__class__.__name__))
+                        dictionary = fresh_dictionary()
+                        dictionary['_internal']['starttime'] = None
+                        dictionary['_internal']['modtime'] = None
+                        is_valid = False
                 else:
-                    interview_title['full'] += ' - ' + word('interview answers cannot be decrypted')
+                    try:
+                        dictionary = unpack_dictionary(interview_info['dictionary'])
+                    except Exception as the_err:
+                        if exclude_invalid:
+                            continue
+                        try:
+                            logmessage("user_interviews: unable to unpack dictionary.  " + str(the_err.__class__.__name__) + ": " + str(the_err))
+                        except:
+                            logmessage("user_interviews: unable to unpack dictionary.  " + str(the_err.__class__.__name__))
+                        dictionary = fresh_dictionary()
+                        dictionary['_internal']['starttime'] = None
+                        dictionary['_internal']['modtime'] = None
+                        is_valid = False
+                if not isinstance(dictionary, dict):
+                    logmessage("user_interviews: found a dictionary that was not a dictionary")
+                    continue
+            if is_valid:
+                if include_dict:
+                    interview_title = interview.get_title(dictionary)
+                    tags = interview.get_tags(dictionary)
+                else:
+                    interview_title = interview.get_title(dict(_internal=dict()))
+                    tags = interview.get_tags(dict(_internal=dict()))
+                metadata = copy.deepcopy(interview.consolidated_metadata)
+            elif interview_valid:
+                interview_title = interview.get_title(dict(_internal=dict()))
+                metadata = copy.deepcopy(interview.consolidated_metadata)
+                if include_dict:
+                    tags = interview.get_tags(dictionary)
+                    if 'full' not in interview_title:
+                        interview_title['full'] = word("Interview answers cannot be decrypted")
+                    else:
+                        interview_title['full'] += ' - ' + word('interview answers cannot be decrypted')
+                else:
+                    tags = interview.get_tags(dict(_internal=dict()))
+                    if 'full' not in interview_title:
+                        interview_title['full'] = word('Unknown')
             else:
-                tags = interview.get_tags(dict(_internal=dict()))
-                if 'full' not in interview_title:
-                    interview_title['full'] = word('Unknown')
-        else:
-            interview_title['full'] = word('Error: interview not found and answers could not be decrypted')
-            metadata = dict()
-            tags = set()
-        if include_dict:
-            if dictionary['_internal']['starttime']:
-                utc_starttime = dictionary['_internal']['starttime']
-                starttime = nice_date_from_utc(dictionary['_internal']['starttime'], timezone=the_timezone)
+                interview_title['full'] = word('Error: interview not found and answers could not be decrypted')
+                metadata = dict()
+                tags = set()
+            if include_dict:
+                if dictionary['_internal']['starttime']:
+                    utc_starttime = dictionary['_internal']['starttime']
+                    starttime = nice_date_from_utc(dictionary['_internal']['starttime'], timezone=the_timezone)
+                else:
+                    utc_starttime = None
+                    starttime = ''
+                if dictionary['_internal']['modtime']:
+                    utc_modtime = dictionary['_internal']['modtime']
+                    modtime = nice_date_from_utc(dictionary['_internal']['modtime'], timezone=the_timezone)
+                else:
+                    utc_modtime = None
+                    modtime = ''
             else:
                 utc_starttime = None
                 starttime = ''
-            if dictionary['_internal']['modtime']:
-                utc_modtime = dictionary['_internal']['modtime']
-                modtime = nice_date_from_utc(dictionary['_internal']['modtime'], timezone=the_timezone)
-            else:
-                utc_modtime = None
-                modtime = ''
-        else:
-            utc_starttime = None
-            starttime = ''
-            utc_modtime = interview_info['modtime']
-            modtime = nice_date_from_utc(interview_info['modtime'], timezone=the_timezone)
-        if tag is not None and tag not in tags:
-            continue
-        out = {'filename': interview_info['filename'], 'session': interview_info['key'], 'modtime': modtime, 'starttime': starttime, 'utc_modtime': utc_modtime, 'utc_starttime': utc_starttime, 'title': interview_title.get('full', word('Untitled')), 'subtitle': interview_title.get('sub', None), 'valid': is_valid, 'metadata': metadata, 'tags': tags, 'email': interview_info['email'], 'user_id': interview_info['user_id'], 'temp_user_id': interview_info['temp_user_id']}
-        if include_dict:
-            out['dict'] = dictionary
-        interviews.append(out)
-    return interviews
+                utc_modtime = interview_info['modtime']
+                modtime = nice_date_from_utc(interview_info['modtime'], timezone=the_timezone)
+            if tag is not None and tag not in tags:
+                continue
+            out = {'filename': interview_info['filename'], 'session': interview_info['key'], 'modtime': modtime, 'starttime': starttime, 'utc_modtime': utc_modtime, 'utc_starttime': utc_starttime, 'title': interview_title.get('full', word('Untitled')), 'subtitle': interview_title.get('sub', None), 'valid': is_valid, 'metadata': metadata, 'tags': tags, 'email': interview_info['email'], 'user_id': interview_info['user_id'], 'temp_user_id': interview_info['temp_user_id']}
+            if include_dict:
+                out['dict'] = dictionary
+            interviews.append(out)
+            interviews_length += 1
+        if interviews_length == PAGINATION_LIMIT or results_in_query < PAGINATION_LIMIT_PLUS_ONE:
+            break
+    if there_are_more:
+        return (interviews, start_id)
+    else:
+        return (interviews, None)
 
 @app.route('/interviews', methods=['GET', 'POST'])
 @login_required
 def interview_list():
+    setup_translation()
     if ('json' in request.form and as_int(request.form['json'])) or ('json' in request.args and as_int(request.args['json'])):
         is_json = True
     else:
@@ -20094,20 +20377,37 @@ def interview_list():
     if resume_interview is None and daconfig.get('auto resume interview', None) is not None and (request.args.get('from_login', False) or (re.search(r'user/(register|sign-in)', str(request.referrer)) and 'next=' not in str(request.referrer))):
         resume_interview = daconfig['auto resume interview']
     if resume_interview is not None:
-        interviews = user_interviews(user_id=current_user.id, secret=secret, exclude_invalid=True, filename=resume_interview, include_dict=True)
+        (interviews, start_id) = user_interviews(user_id=current_user.id, secret=secret, exclude_invalid=True, filename=resume_interview, include_dict=True)
         if len(interviews):
             return redirect(url_for('index', i=interviews[0]['filename'], session=interviews[0]['session'], from_list='1'))
         return redirect(url_for('index', i=resume_interview, from_list='1'))
-    interviews = user_interviews(user_id=current_user.id, secret=secret, exclude_invalid=exclude_invalid, tag=tag)
-    if interviews is None:
+    next_id_code = request.args.get('next_id', None)
+    if next_id_code:
+        try:
+            start_id = int(from_safeid(next_id_code))
+            assert start_id >= 0
+            show_back = True
+        except:
+            start_id = None
+            show_back = False
+    else:
+        start_id = None
+        show_back = False
+    result = user_interviews(user_id=current_user.id, secret=secret, exclude_invalid=exclude_invalid, tag=tag, start_id=start_id)
+    if result is None:
         raise Exception("interview_list: could not obtain list of interviews")
+    (interviews, start_id) = result
+    if start_id is None:
+        next_id = None
+    else:
+        next_id = safeid(str(start_id))
     if is_json:
         for interview in interviews:
             if 'dict' in interview:
                 del interview['dict']
             if 'tags' in interview:
                 interview['tags'] = sorted(interview['tags'])
-        return jsonify(action="interviews", interviews=interviews)
+        return jsonify(action="interviews", interviews=interviews, next_id=next_id)
     script = """
     <script>
       $("#deleteall").on('click', function(event){
@@ -20128,7 +20428,7 @@ def interview_list():
                 tags_used.add(the_tag)
     #interview_page_title = word(daconfig.get('interview page title', 'Interviews'))
     #title = word(daconfig.get('interview page heading', 'Resume an interview'))
-    argu = dict(version_warning=version_warning, tags_used=sorted(tags_used) if len(tags_used) else None, numinterviews=len([y for y in interviews if not y['metadata'].get('hidden', False)]), interviews=sorted(interviews, key=valid_date_key), tag=tag) # extra_css=Markup(global_css), extra_js=Markup(script), tab_title=interview_page_title, page_title=interview_page_title, title=title
+    argu = dict(version_warning=version_warning, tags_used=sorted(tags_used) if len(tags_used) else None, numinterviews=len([y for y in interviews if not y['metadata'].get('hidden', False)]), interviews=sorted(interviews, key=valid_date_key), tag=tag, next_id=next_id, show_back=show_back) # extra_css=Markup(global_css), extra_js=Markup(script), tab_title=interview_page_title, page_title=interview_page_title, title=title
     if 'interview page template' in daconfig and daconfig['interview page template']:
         the_page = docassemble.base.functions.package_template_filename(daconfig['interview page template'])
         if the_page is None:
@@ -20184,6 +20484,7 @@ def login_or_register(sender, user, source, **extra):
         session['user_id'] = user.id
     if user.language:
         session['language'] = user.language
+        docassemble.base.functions.set_language(user.language)
 
 def update_last_login(user):
     user.last_login = datetime.datetime.utcnow()
@@ -20201,10 +20502,10 @@ def _on_password_change(sender, user, **extra):
     #logmessage("on password change")
     fix_secret(user=user)
 
-@user_reset_password.connect_via(app)
-def _on_password_reset(sender, user, **extra):
-    #logmessage("on password reset")
-    fix_secret(user=user)
+# @user_reset_password.connect_via(app)
+# def _on_password_reset(sender, user, **extra):
+#     #logmessage("on password reset")
+#     fix_secret(user=user)
 
 @user_registered.connect_via(app)
 def on_register_hook(sender, user, **extra):
@@ -20258,6 +20559,7 @@ def fax_callback():
 @app.route("/voice", methods=['POST', 'GET'])
 @csrf.exempt
 def voice():
+    docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
     resp = twilio.twiml.voice_response.VoiceResponse()
     if twilio_config is None:
         logmessage("voice: ignoring call to voice because Twilio not enabled")
@@ -20292,6 +20594,7 @@ def voice():
 @app.route("/digits", methods=['POST', 'GET'])
 @csrf.exempt
 def digits():
+    docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
     resp = twilio.twiml.voice_response.VoiceResponse()
     if twilio_config is None:
         logmessage("digits: ignoring call to digits because Twilio not enabled")
@@ -20411,6 +20714,7 @@ def sms():
     return Response(str(resp), mimetype='text/xml')
 
 def do_sms(form, base_url, url_root, config='default', save=True):
+    docassemble.base.functions.set_language(DEFAULT_LANGUAGE)
     resp = twilio.twiml.messaging_response.MessagingResponse()
     special_messages = list()
     if twilio_config is None:
@@ -21240,32 +21544,55 @@ def true_or_false(text):
         return False
     return True
 
-def get_user_list(include_inactive=False):
+def get_user_list(include_inactive=False, start_id=None):
     if not (current_user.is_authenticated and current_user.has_role('admin', 'advocate')):
         raise Exception("You cannot call get_user_list() unless you are an administrator or advocate")
-    if include_inactive:
-        the_users = UserModel.query.options(db.joinedload('roles')).order_by(UserModel.id).all()
-    else:
-        the_users = UserModel.query.options(db.joinedload('roles')).filter_by(active=True).order_by(UserModel.id).all()
+    user_length = 0
     user_list = list()
-    for user in the_users:
-        if user.social_id.startswith('disabled$'):
-            continue
-        user_info = dict()
-        user_info['privileges'] = list()
-        for role in user.roles:
-            user_info['privileges'].append(role.name)
-        for attrib in ('id', 'email', 'first_name', 'last_name', 'country', 'subdivisionfirst', 'subdivisionsecond', 'subdivisionthird', 'organization', 'timezone', 'language'):
-            user_info[attrib] = getattr(user, attrib)
-        if include_inactive:
-            user_info['active'] = getattr(user, 'active')
-        user_list.append(user_info)
-    return user_list
+    while True:
+        there_are_more = False
+        filter_list = []
+        if start_id is not None:
+            filter_list.append(UserModel.id > start_id)
+        if not include_inactive:
+            filter_list.append(UserModel.active == True)
+        the_users = UserModel.query.options(db.joinedload('roles'))
+        if len(filter_list):
+            the_users = the_users.filter(*filter_list)
+        the_users = the_users.order_by(UserModel.id).limit(PAGINATION_LIMIT_PLUS_ONE)
+        results_in_query = 0
+        for user in the_users:
+            results_in_query += 1
+            if results_in_query == PAGINATION_LIMIT_PLUS_ONE:
+                there_are_more = True
+                break
+            start_id = user.id
+            if user.social_id.startswith('disabled$'):
+                continue
+            if user_length == PAGINATION_LIMIT:
+                there_are_more = True
+                break
+            user_info = dict()
+            user_info['privileges'] = list()
+            for role in user.roles:
+                user_info['privileges'].append(role.name)
+            for attrib in ('id', 'email', 'first_name', 'last_name', 'country', 'subdivisionfirst', 'subdivisionsecond', 'subdivisionthird', 'organization', 'timezone', 'language'):
+                user_info[attrib] = getattr(user, attrib)
+            if include_inactive:
+                user_info['active'] = getattr(user, 'active')
+            user_list.append(user_info)
+            user_length += 1
+        if user_length == PAGINATION_LIMIT or results_in_query < PAGINATION_LIMIT_PLUS_ONE:
+            break
+    if not there_are_more:
+        start_id = None
+    return (user_list, start_id)
 
 @app.route('/translation_file', methods=['POST'])
 @login_required
 @roles_required(['admin', 'developer'])
 def translation_file():
+    setup_translation()
     form = Utilities(request.form)
     yaml_filename = form.interview.data
     if yaml_filename is None or not re.search(r'\S', yaml_filename):
@@ -21551,14 +21878,32 @@ def api_user_list():
     if not api_verify(request, roles=['admin', 'advocate']):
         return jsonify_with_status("Access denied.", 403)
     include_inactive = true_or_false(request.args.get('include_inactive', False))
-    user_list = get_user_list(include_inactive)
-    return jsonify(user_list)
+    next_id_code = request.args.get('next_id', None)
+    if next_id_code:
+        try:
+            start_id = int(from_safeid(next_id_code))
+            assert start_id >= 0
+        except:
+            start_id = None
+    else:
+        start_id = None
+    (user_list, start_id) = get_user_list(include_inactive=include_inactive, start_id=start_id)
+    if start_id is None:
+        next_id = None
+    else:
+        next_id = safeid(str(start_id))
+    return jsonify(dict(next_id=next_id, items=user_list))
 
-def get_user_info(user_id=None, email=None):
+def get_user_info(user_id=None, email=None, case_sensitive=False):
     if current_user.is_anonymous:
         raise Exception("You cannot call get_user_info() unless you are logged in")
+    if user_id is not None:
+        assert isinstance(user_id, int)
     if user_id is None and email is None:
         user_id = current_user.id
+    if email is not None:
+        assert isinstance(email, str)
+        email = email.strip()
     if not (current_user.has_role('admin', 'advocate')):
         if (user_id is not None and current_user.id != user_id) or (email is not None and current_user.email != email):
             raise Exception("You cannot call get_user_info() unless you are an administrator or advocate")
@@ -21566,7 +21911,10 @@ def get_user_info(user_id=None, email=None):
     if user_id is not None:
         user = UserModel.query.options(db.joinedload('roles')).filter_by(id=user_id).first()
     else:
-        user = UserModel.query.options(db.joinedload('roles')).filter_by(email=email).first()
+        if case_sensitive:
+            user = UserModel.query.options(db.joinedload('roles')).filter_by(email=email).first()
+        else:
+            user = UserModel.query.options(db.joinedload('roles')).filter(UserModel.email.ilike(email)).first()
     if user is None or user.social_id.startswith('disabled$'):
         return None
     for role in user.roles:
@@ -21586,6 +21934,8 @@ def make_user_inactive(user_id=None, email=None):
     if user_id is not None:
         user = UserModel.query.filter_by(id=user_id).first()
     else:
+        assert isinstance(email, str)
+        email = email.strip()
         user = UserModel.query.filter_by(email=email).first()
     if user is None:
         raise Exception("User not found")
@@ -21651,7 +22001,7 @@ def api_create_user():
     info = dict()
     for key in ('first_name', 'last_name', 'country', 'subdivisionfirst', 'subdivisionsecond', 'subdivisionthird', 'organization', 'timezone', 'language'):
         if key in post_data:
-            info[key] = post_data[key]
+            info[key] = post_data[key].strip()
     if 'privileges' in post_data and isinstance(post_data['privileges'], list):
         role_list = post_data['privileges']
     else:
@@ -21669,7 +22019,7 @@ def api_create_user():
     for role_name in role_list:
         if role_name not in valid_role_names:
             return jsonify_with_status("Invalid privilege name.  " + role_name + " is not an existing privilege.", 400)
-    password = post_data.get('password', random_alphanumeric(10))
+    password = post_data.get('password', random_alphanumeric(10)).strip()
     if len(password) < 4 or len(password) > 254:
         return jsonify_with_status("Password too short or too long", 400)
     try:
@@ -21686,8 +22036,9 @@ def api_user_info():
         return jsonify_with_status("Access denied.", 403)
     if 'username' not in request.args:
         return jsonify_with_status("An e-mail address must be supplied.", 400)
+    case_sensitive = true_or_false(request.args.get('case_sensitive', False))
     try:
-        user_info = get_user_info(email=request.args['username'])
+        user_info = get_user_info(email=request.args['username'], case_sensitive=case_sensitive)
     except Exception as err:
         return jsonify_with_status("Error obtaining user information: " + str(err), 400)
     if user_info is None:
@@ -21732,7 +22083,7 @@ def api_user_by_id(user_id):
             make_user_inactive(user_id=user_id)
         return ('', 204)
     elif request.method == 'POST':
-        if current_user.id != user_id or not current_user.has_role('admin', 'advocate'):
+        if not (current_user.has_role('admin', 'advocate') or current_user.id != user_id):
             return jsonify_with_status("You must have admin or advocate privileges to edit user information.", 403)
         post_data = request.get_json(silent=True)
         if post_data is None:
@@ -21950,9 +22301,10 @@ def create_user(email, password, privileges=None, info=None):
         raise Exception("You cannot call create_user() unless you are logged in")
     if not (current_user.has_role('admin')):
         raise Exception("You cannot call create_user() unless you are an administrator")
+    email = email.strip()
+    password = str(password).strip()
     if len(password) < 4 or len(password) > 254:
         raise Exception("Password too short or too long")
-    password = str(password)
     role_dict = dict()
     if privileges is None:
         privileges = list()
@@ -22093,22 +22445,39 @@ def api_users_interviews():
     filename = request.args.get('i', None)
     secret = request.args.get('secret', None)
     tag = request.args.get('tag', None)
+    next_id_code = request.args.get('next_id', None)
+    if next_id_code:
+        try:
+            start_id = int(from_safeid(next_id_code))
+            assert start_id >= 0
+        except:
+            start_id = None
+    else:
+        start_id = None
     if secret is not None:
         secret = str(secret)
     if request.method == 'GET':
         include_dict = true_or_false(request.args.get('include_dictionary', False))
         try:
-            the_list = user_interviews(user_id=user_id, secret=secret, exclude_invalid=False, tag=tag, filename=filename, include_dict=include_dict)
-        except:
-            return jsonify_with_status("Error getting interview list.", 400)
-        return jsonify(docassemble.base.functions.safe_json(the_list))
+            (the_list, start_id) = user_interviews(user_id=user_id, secret=secret, exclude_invalid=False, tag=tag, filename=filename, include_dict=include_dict, start_id=start_id)
+        except Exception as err:
+            return jsonify_with_status("Error getting interview list.  " + str(err), 400)
+        if start_id is None:
+            next_id = None
+        else:
+            next_id = safeid(str(start_id))
+        return jsonify(dict(next_id=next_id, items=docassemble.base.functions.safe_json(the_list)))
     elif request.method == 'DELETE':
-        try:
-            the_list = user_interviews(user_id=user_id, exclude_invalid=False, tag=tag, filename=filename, include_dict=False)
-        except:
-            return jsonify_with_status("Error reading interview list.", 400)
-        for info in the_list:
-            user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+        start_id = None
+        while True:
+            try:
+                (the_list, start_id) = user_interviews(user_id=user_id, exclude_invalid=False, tag=tag, filename=filename, include_dict=False, start_id=start_id)
+            except:
+                return jsonify_with_status("Error reading interview list.", 400)
+            for info in the_list:
+                user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+            if start_id is None:
+                break
         return ('', 204)
 
 @app.route('/api/user/<int:user_id>/interviews', methods=['GET', 'DELETE'])
@@ -22122,22 +22491,39 @@ def api_user_user_id_interviews(user_id):
     filename = request.args.get('i', None)
     secret = request.args.get('secret', None)
     tag = request.args.get('tag', None)
+    next_id_code = request.args.get('next_id', None)
+    if next_id_code:
+        try:
+            start_id = int(from_safeid(next_id_code))
+            assert start_id >= 0
+        except:
+            start_id = None
+    else:
+        start_id = None
     if secret is not None:
         secret = str(secret)
     include_dict = true_or_false(request.args.get('include_dictionary', False))
     if request.method == 'GET':
         try:
-            the_list = user_interviews(user_id=user_id, secret=secret, exclude_invalid=False, tag=tag, filename=filename, include_dict=include_dict)
+            (the_list, start_id) = user_interviews(user_id=user_id, secret=secret, exclude_invalid=False, tag=tag, filename=filename, include_dict=include_dict, start_id=start_id)
         except:
             return jsonify_with_status("Error reading interview list.", 400)
-        return jsonify(docassemble.base.functions.safe_json(the_list))
+        if start_id is None:
+            next_id = None
+        else:
+            next_id = safeid(str(start_id))
+        return jsonify(dict(next_id=next_id, items=docassemble.base.functions.safe_json(the_list)))
     elif request.method == 'DELETE':
-        try:
-            the_list = user_interviews(user_id=user_id, exclude_invalid=False, tag=tag, filename=filename, include_dict=False)
-        except:
-            return jsonify_with_status("Error reading interview list.", 400)
-        for info in the_list:
-            user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+        start_id = None
+        while True:
+            try:
+                (the_list, start_id) = user_interviews(user_id=user_id, exclude_invalid=False, tag=tag, filename=filename, include_dict=False, start_id=start_id)
+            except:
+                return jsonify_with_status("Error reading interview list.", 400)
+            for info in the_list:
+                user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+            if start_id is None:
+                break
         return ('', 204)
 
 @app.route('/api/session/back', methods=['POST'])
@@ -22231,6 +22617,7 @@ def api_session():
         question_name = post_data.get('question_name', None)
         treat_as_raw = true_or_false(post_data.get('raw', False))
         advance_progress_meter = true_or_false(post_data.get('advance_progress_meter', False))
+        post_setting = not true_or_false(post_data.get('overwrite', False))
         reply_with_question = true_or_false(post_data.get('question', True))
         if yaml_filename is None or session_id is None:
             return jsonify_with_status("Parameters i and session are required.", 400)
@@ -22303,7 +22690,7 @@ def api_session():
             else:
                 literal_variables[file_field] = "None"
         try:
-            data = set_session_variables(yaml_filename, session_id, variables, secret=secret, return_question=reply_with_question, literal_variables=literal_variables, del_variables=del_variables, question_name=question_name, event_list=event_list, advance_progress_meter=advance_progress_meter)
+            data = set_session_variables(yaml_filename, session_id, variables, secret=secret, return_question=reply_with_question, literal_variables=literal_variables, del_variables=del_variables, question_name=question_name, event_list=event_list, advance_progress_meter=advance_progress_meter, post_setting=post_setting)
         except Exception as the_err:
             return jsonify_with_status(str(the_err), 400)
         if data is None:
@@ -22409,7 +22796,7 @@ def go_back_in_session(yaml_filename, session_id, secret=None, return_question=F
     #release_lock(session_id, yaml_filename)
     return data
 
-def set_session_variables(yaml_filename, session_id, variables, secret=None, return_question=False, literal_variables=None, del_variables=None, question_name=None, event_list=None, advance_progress_meter=False):
+def set_session_variables(yaml_filename, session_id, variables, secret=None, return_question=False, literal_variables=None, del_variables=None, question_name=None, event_list=None, advance_progress_meter=False, post_setting=True):
     #obtain_lock(session_id, yaml_filename)
     if secret is None:
         secret = docassemble.base.functions.this_thread.current_info.get('secret', None)
@@ -22440,7 +22827,7 @@ def set_session_variables(yaml_filename, session_id, variables, secret=None, ret
                 break
     if pre_assembly_necessary:
         interview = docassemble.base.interview_cache.get_interview(yaml_filename)
-        ci = current_info(yaml=yaml_filename, req=request)
+        ci = current_info(yaml=yaml_filename, req=request, secret=secret)
         ci['session'] = session_id
         ci['encrypted'] = is_encrypted
         ci['secret'] = secret
@@ -22450,12 +22837,12 @@ def set_session_variables(yaml_filename, session_id, variables, secret=None, ret
         for key, val in variables.items():
             if illegal_variable_name(key):
                 raise Exception("Illegal value as variable name.")
-            if isinstance(val, (docassemble.base.util.DADateTime, docassemble.base.util.DAObject)):
-                user_dict['_internal']['_tempvar'] = val
+            if isinstance(val, (str, bool, int, float, NoneType)):
+                exec(str(key) + ' = ' + repr(val), user_dict)
+            else:
+                user_dict['_internal']['_tempvar'] = copy.deepcopy(val)
                 exec(str(key) + ' = _internal["_tempvar"]', user_dict)
                 del user_dict['_internal']['_tempvar']
-            else:
-                exec(str(key) + ' = ' + repr(val), user_dict)
             process_set_variable(str(key), user_dict, vars_set, old_values)
     except Exception as the_err:
         #release_lock(session_id, yaml_filename)
@@ -22511,17 +22898,18 @@ def set_session_variables(yaml_filename, session_id, variables, secret=None, ret
                 pass
     #if 'event_stack' in user_dict['_internal']:
     #    logmessage("Event stack now: " + repr(user_dict['_internal']['event_stack']))
-    steps += 1
+    if post_setting:
+        steps += 1
     if return_question:
         try:
-            data = get_question_data(yaml_filename, session_id, secret, use_lock=True, user_dict=user_dict, steps=steps, is_encrypted=is_encrypted, post_setting=True, advance_progress_meter=advance_progress_meter)
+            data = get_question_data(yaml_filename, session_id, secret, use_lock=True, user_dict=user_dict, steps=steps, is_encrypted=is_encrypted, post_setting=post_setting, advance_progress_meter=advance_progress_meter)
         except Exception as the_err:
             #release_lock(session_id, yaml_filename)
             raise Exception("Problem getting current question:" + str(the_err))
     else:
         data = None
     if not return_question:
-        save_user_dict(session_id, user_dict, yaml_filename, secret=secret, encrypt=is_encrypted, changed=True, steps=steps)
+        save_user_dict(session_id, user_dict, yaml_filename, secret=secret, encrypt=is_encrypted, changed=post_setting, steps=steps)
         if 'multi_user' in vars_set:
             if user_dict.get('multi_user', False) is True and is_encrypted is True:
                 decrypt_session(secret, user_code=session_id, filename=yaml_filename)
@@ -22554,7 +22942,7 @@ def api_session_new():
         if re.match('[A-Za-z_][A-Za-z0-9_]*', argname):
             url_args[argname] = request.args[argname]
     try:
-        (encrypted, session_id) = create_new_interview(yaml_filename, secret, url_args=url_args, request=request)
+        (encrypted, session_id) = create_new_interview(yaml_filename, secret, url_args=url_args, req=request)
     except Exception as err:
         return jsonify_with_status(str(err), 400)
     if encrypted and new_secret:
@@ -22562,36 +22950,46 @@ def api_session_new():
     else:
         return jsonify(dict(session=session_id, i=yaml_filename, encrypted=encrypted))
 
-def create_new_interview(yaml_filename, secret, url_args=None, request=None):
+def create_new_interview(yaml_filename, secret, url_args=None, req=None):
     interview = docassemble.base.interview_cache.get_interview(yaml_filename)
     if not interview.allowed_to_access(has_roles=[role.name for role in current_user.roles]):
         raise Exception('Insufficient permissions to run this interview.')
+    if req is None:
+        req = request
+    if secret is None:
+        secret = random_string(16)
     session_id, user_dict = reset_session(yaml_filename, secret)
     add_referer(user_dict)
     if url_args:
         for key, val in url_args.items():
-            exec("url_args['" + key + "'] = " + repr(val.encode('unicode_escape')), user_dict)
-    ci = current_info(yaml=yaml_filename, req=request)
+            if isinstance(val, str):
+                val = val.encode('unicode_escape').decode()
+            exec("url_args['" + key + "'] = " + repr(val), user_dict)
+    ci = current_info(yaml=yaml_filename, req=req, secret=secret)
     ci['session'] = session_id
     ci['encrypted'] = True
     ci['secret'] = secret
     interview_status = docassemble.base.parse.InterviewStatus(current_info=ci)
     interview_status.checkin = True
-    old_language = docassemble.base.functions.get_language()
+    tbackup = docassemble.base.functions.backup_thread_variables()
+    sbackup = backup_session()
     try:
         interview.assemble(user_dict, interview_status)
     except DAErrorMissingVariable as err:
         pass
     except Exception as e:
         release_lock(session_id, yaml_filename)
-        docassemble.base.functions.set_language(old_language)
+        restore_session(sbackup)
+        docassemble.base.functions.restore_thread_variables(tbackup)
         raise Exception("create_new_interview: failure to assemble interview: " + e.__class__.__name__ + ": " + str(e))
-    docassemble.base.functions.set_language(old_language)
+    restore_session(sbackup)
+    docassemble.base.functions.restore_thread_variables(tbackup)
     if user_dict.get('multi_user', False) is True:
         encrypted = False
     else:
         encrypted = True
     save_user_dict(session_id, user_dict, yaml_filename, secret=secret, encrypt=encrypted, changed=False, steps=1)
+    save_user_dict_key(session_id, yaml_filename)
     release_lock(session_id, yaml_filename)
     return (encrypted, session_id)
 
@@ -22624,17 +23022,9 @@ def get_question_data(yaml_filename, session_id, secret, use_lock=True, user_dic
         except Exception as err:
             if use_lock:
                 release_lock(session_id, yaml_filename)
-            raise Exception("Unable to obtain interview dictionary")
-    try:
-        the_section = user_dict['nav'].get_section()
-        the_section_display = user_dict['nav'].get_section(display=True)
-        the_sections = user_dict['nav'].get_sections()
-    except:
-        the_section = None
-        the_section_display = None
-        the_sections = list()
+            raise Exception("Unable to obtain interview dictionary: " + str(err))
     interview = docassemble.base.interview_cache.get_interview(yaml_filename)
-    ci = current_info(yaml=yaml_filename, req=request)
+    ci = current_info(yaml=yaml_filename, req=request, secret=secret)
     ci['session'] = session_id
     ci['encrypted'] = is_encrypted
     ci['secret'] = secret
@@ -22660,6 +23050,14 @@ def get_question_data(yaml_filename, session_id, secret, use_lock=True, user_dic
     save_status = docassemble.base.functions.this_thread.misc.get('save_status', 'new')
     restore_session(sbackup)
     docassemble.base.functions.restore_thread_variables(tbackup)
+    try:
+        the_section = user_dict['nav'].get_section()
+        the_section_display = user_dict['nav'].get_section(display=True)
+        the_sections = user_dict['nav'].get_sections()
+    except:
+        the_section = None
+        the_section_display = None
+        the_sections = list()
     if advance_progress_meter:
         if interview_status.question.interview.use_progress_bar and interview_status.question.progress is None and save_status == 'new':
             advance_progress(user_dict, interview)
@@ -22709,7 +23107,7 @@ def get_question_data(yaml_filename, session_id, secret, use_lock=True, user_dic
     title_info = interview_status.question.interview.get_title(user_dict, status=interview_status, converter=lambda content, part: title_converter(content, part, interview_status))
     interview_status.exit_url = title_info.get('exit url', None)
     interview_status.exit_link = title_info.get('exit link', 'exit')
-    interview_status.exit_label = title_info.get('exit label', 'Exit')
+    interview_status.exit_label = title_info.get('exit label', word('Exit'))
     interview_status.title = title_info.get('full', default_title)
     interview_status.display_title = title_info.get('logo', interview_status.title)
     interview_status.tabtitle = title_info.get('tab', interview_status.title)
@@ -22720,6 +23118,11 @@ def get_question_data(yaml_filename, session_id, secret, use_lock=True, user_dic
     the_main_page_parts = main_page_parts.get(interview_language, main_page_parts.get('*'))
     interview_status.pre = title_info.get('pre', the_main_page_parts['main page pre'])
     interview_status.post = title_info.get('post', the_main_page_parts['main page post'])
+    interview_status.footer = title_info.get('footer', the_main_page_parts['main page footer'] or get_part('global footer'))
+    if interview_status.footer:
+        interview_status.footer = re.sub(r'</?p.*?>', '', str(interview_status.footer), flags=re.IGNORECASE).strip()
+        if interview_status.footer == 'off':
+            interview_status.footer = ''
     interview_status.submit = title_info.get('submit', the_main_page_parts['main page submit'])
     bootstrap_theme = interview_status.question.interview.get_bootstrap_theme()
     if steps is None:
@@ -22764,6 +23167,7 @@ def api_session_action():
     session_id = post_data.get('session', None)
     secret = post_data.get('secret', None)
     action = post_data.get('action', None)
+    persistent = true_or_false(post_data.get('persistent', False))
     if yaml_filename is None or session_id is None or action is None:
         return jsonify_with_status("Parameters i, session, and action are required.", 400)
     secret = str(secret)
@@ -22786,12 +23190,13 @@ def api_session_action():
         release_lock(session_id, yaml_filename)
         return jsonify_with_status("Unable to obtain interview dictionary.", 400)
     interview = docassemble.base.interview_cache.get_interview(yaml_filename)
-    ci = current_info(yaml=yaml_filename, req=request, action=dict(action=action, arguments=arguments))
+    ci = current_info(yaml=yaml_filename, req=request, action=dict(action=action, arguments=arguments), secret=secret)
     ci['session'] = session_id
     ci['encrypted'] = is_encrypted
     ci['secret'] = secret
     interview_status = docassemble.base.parse.InterviewStatus(current_info=ci)
-    interview_status.checkin = True
+    if not persistent:
+        interview_status.checkin = True
     old_language = docassemble.base.functions.get_language()
     try:
         interview.assemble(user_dict, interview_status)
@@ -22921,19 +23326,36 @@ def api_user_interviews():
     if secret is not None:
         secret = str(secret)
     include_dict = true_or_false(request.args.get('include_dictionary', False))
+    next_id_code = request.args.get('next_id', None)
+    if next_id_code:
+        try:
+            start_id = int(from_safeid(next_id_code))
+            assert start_id >= 0
+        except:
+            start_id = None
+    else:
+        start_id = None
     if request.method == 'GET':
         try:
-            the_list = user_interviews(user_id=current_user.id, secret=secret, filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=include_dict)
+            (the_list, start_id) = user_interviews(user_id=current_user.id, secret=secret, filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=include_dict, start_id=start_id)
         except:
             return jsonify_with_status("Error reading interview list.", 400)
-        return jsonify(docassemble.base.functions.safe_json(the_list))
+        if start_id is None:
+            next_id = None
+        else:
+            next_id = safeid(str(start_id))
+        return jsonify(dict(next_id=next_id, items=docassemble.base.functions.safe_json(the_list)))
     elif request.method == 'DELETE':
-        try:
-            the_list = user_interviews(user_id=current_user.id, filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=False)
-        except:
-            return jsonify_with_status("Error reading interview list.", 400)
-        for info in the_list:
-            user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+        start_id = None
+        while True:
+            try:
+                (the_list, start_id) = user_interviews(user_id=current_user.id, filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=False, start_id=start_id)
+            except:
+                return jsonify_with_status("Error reading interview list.", 400)
+            for info in the_list:
+                user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+            if start_id is None:
+                break
         return ('', 204)
 
 @app.route('/api/interviews', methods=['GET', 'DELETE'])
@@ -22949,19 +23371,36 @@ def api_interviews():
     if secret is not None:
         secret = str(secret)
     include_dict = true_or_false(request.args.get('include_dictionary', False))
+    next_id_code = request.args.get('next_id', None)
+    if next_id_code:
+        try:
+            start_id = int(from_safeid(next_id_code))
+            assert start_id >= 0
+        except:
+            start_id = None
+    else:
+        start_id = None
     if request.method == 'GET':
         try:
-            the_list = user_interviews(secret=secret, filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=include_dict)
+            (the_list, start_id) = user_interviews(secret=secret, filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=include_dict, start_id=start_id)
         except Exception as err:
             return jsonify_with_status("Error reading interview list: " + str(err), 400)
-        return jsonify(docassemble.base.functions.safe_json(the_list))
+        if start_id is None:
+            next_id = None
+        else:
+            next_id = safeid(str(start_id))
+        return jsonify(dict(next_id=next_id, items=docassemble.base.functions.safe_json(the_list)))
     elif request.method == 'DELETE':
-        try:
-            the_list = user_interviews(filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=False)
-        except:
-            return jsonify_with_status("Error reading interview list.", 400)
-        for info in the_list:
-            user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+        start_id = None
+        while True:
+            try:
+                (the_list, start_id) = user_interviews(filename=filename, session=session, exclude_invalid=False, tag=tag, include_dict=False, start_id=start_id)
+            except:
+                return jsonify_with_status("Error reading interview list.", 400)
+            for info in the_list:
+                user_interviews(user_id=info['user_id'], action='delete', filename=info['filename'], session=info['session'])
+            if start_id is None:
+                break
         return ('', 204)
 
 def jsonify_task(result):
@@ -23636,6 +24075,7 @@ def api_interview_data():
 @app.route('/manage_api', methods=['GET', 'POST'])
 @login_required
 def manage_api():
+    setup_translation()
     if not current_user.has_role(*daconfig.get('api privileges', ['admin', 'developer'])):
         return ('File not found', 404)
     form = APIKey(request.form)
@@ -24310,9 +24750,10 @@ def applock(action, application):
 @app.errorhandler(CSRFError)
 def handle_csrf_error(the_error):
     if request.method == 'POST':
+        setup_translation()
         if 'ajax' in request.form and int(request.form['ajax']):
             flash(word("Input not processed because the page expired."), "success")
-            return jsonify(dict(action='reload'))
+            return jsonify(dict(action='reload', reason='csrf_error'))
         try:
             referer = str(request.referrer)
         except:
@@ -24439,6 +24880,8 @@ if not os.access(WEBAPP_PATH, os.W_OK):
 
 from docassemble.webapp.daredis import r, r_user
 
+from docassemble.webapp.jsonstore import read_answer_json, write_answer_json, delete_answer_json, variables_snapshot_connection
+
 docassemble.base.functions.update_server(url_finder=get_url_from_file_reference,
                                          navigation_bar=navigation_bar,
                                          chat_partners_available=chat_partners_available,
@@ -24468,6 +24911,7 @@ docassemble.base.functions.update_server(url_finder=get_url_from_file_reference,
                                          get_secret=get_secret,
                                          get_session_variables=get_session_variables,
                                          go_back_in_session=go_back_in_session,
+                                         create_session=create_new_interview,
                                          set_session_variables=set_session_variables,
                                          get_privileges_list=get_privileges_list,
                                          add_privilege=add_privilege,
@@ -24486,7 +24930,12 @@ docassemble.base.functions.update_server(url_finder=get_url_from_file_reference,
                                          main_page_parts=main_page_parts,
                                          SavedFile=SavedFile,
                                          path_from_reference=path_from_reference,
-                                         button_class_prefix=app.config['BUTTON_STYLE'])
+                                         button_class_prefix=app.config['BUTTON_STYLE'],
+                                         write_answer_json=write_answer_json,
+                                         read_answer_json=read_answer_json,
+                                         delete_answer_json=delete_answer_json,
+                                         variables_snapshot_connection=variables_snapshot_connection)
+
 #docassemble.base.util.set_user_id_function(user_id_dict)
 #docassemble.base.functions.set_generate_csrf(generate_csrf)
 #docassemble.base.parse.set_url_finder(get_url_from_file_reference)
